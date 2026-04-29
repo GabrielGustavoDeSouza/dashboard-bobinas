@@ -196,16 +196,40 @@ def load_data_from_sharepoint():
 
     # 3. Ler Excel
     excel_bytes = io.BytesIO(file_resp.content)
-    df_controle = pd.read_excel(excel_bytes, sheet_name="Controle")
+    df_controle = smart_read_excel(excel_bytes, "Controle")
+    excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
 
     return df_controle, df_formulas
 
 
+def smart_read_excel(excel_bytes, sheet_name):
+    """Lê uma aba do Excel detectando automaticamente a linha do cabeçalho."""
+    # Tenta ler normalmente primeiro
+    df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=0)
+    
+    # Se todas as colunas são 'Unnamed', o cabeçalho real está em outra linha
+    unnamed_count = sum(1 for c in df.columns if str(c).startswith('Unnamed'))
+    if unnamed_count > len(df.columns) * 0.5:
+        # Procurar a linha que contém o cabeçalho real (até as primeiras 5 linhas)
+        excel_bytes.seek(0)
+        df_raw = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=None)
+        for row_idx in range(min(5, len(df_raw))):
+            row_vals = [str(v).replace('\n', ' ').strip() for v in df_raw.iloc[row_idx] if pd.notna(v)]
+            # Verificar se esta linha parece um cabeçalho
+            if any('Código' in v or 'Bobina' in v or 'NECESSIDADE' in v or 'Tipo' in v for v in row_vals):
+                excel_bytes.seek(0)
+                df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=row_idx)
+                break
+    
+    return df
+
+
 def load_data_from_upload(uploaded_file):
     """Lê o Excel do upload manual."""
     excel_bytes = io.BytesIO(uploaded_file.getvalue())
-    df_controle = pd.read_excel(excel_bytes, sheet_name="Controle")
+    df_controle = smart_read_excel(excel_bytes, "Controle")
+    excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
     return df_controle, df_formulas
 
