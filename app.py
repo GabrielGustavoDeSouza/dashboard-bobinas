@@ -1,6 +1,7 @@
 """
 Dashboard de Controle de Matéria-Prima — Bobinas BSW
-Lê o arquivo Excel diretamente do SharePoint via Microsoft Graph API.
+Lê o arquivo Excel diretamente do SharePoint via Microsoft Graph API
+ou permite upload manual do arquivo.
 """
 import streamlit as st
 import pandas as pd
@@ -17,7 +18,7 @@ st.set_page_config(
     page_title="Dashboard Bobinas BSW",
     page_icon="🏭",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ============================================================
@@ -95,6 +96,20 @@ st.markdown("""
     .js-plotly-plot .plotly .main-svg {
         background-color: #162236 !important;
     }
+    /* Upload area */
+    div[data-testid="stFileUploader"] {
+        background-color: #162236;
+        border: 2px dashed #1E3A5F;
+        border-radius: 12px;
+        padding: 16px;
+    }
+    div[data-testid="stFileUploader"]:hover {
+        border-color: #00D4FF;
+    }
+    /* Sidebar radio */
+    div[data-testid="stSidebar"] .stRadio label {
+        color: #B0BEC5 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -139,7 +154,7 @@ PLOTLY_LAYOUT = dict(
 # ============================================================
 # FUNÇÕES DE CONEXÃO COM SHAREPOINT
 # ============================================================
-@st.cache_data(ttl=300)  # Cache de 5 minutos
+@st.cache_data(ttl=300)
 def get_access_token():
     """Obtém token de acesso via Microsoft Graph API."""
     tenant_id = st.secrets["TENANT_ID"]
@@ -158,7 +173,7 @@ def get_access_token():
     return response.json()["access_token"]
 
 
-@st.cache_data(ttl=300)  # Cache de 5 minutos — atualiza ao recarregar
+@st.cache_data(ttl=300)
 def load_data_from_sharepoint():
     """Baixa o Excel do SharePoint e retorna DataFrames."""
     token = get_access_token()
@@ -187,9 +202,16 @@ def load_data_from_sharepoint():
     return df_controle, df_formulas
 
 
+def load_data_from_upload(uploaded_file):
+    """Lê o Excel do upload manual."""
+    excel_bytes = io.BytesIO(uploaded_file.getvalue())
+    df_controle = pd.read_excel(excel_bytes, sheet_name="Controle")
+    df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
+    return df_controle, df_formulas
+
+
 def process_data(df_raw):
     """Processa e limpa os dados do controle."""
-    # Limpar nomes de colunas
     df = df_raw.copy()
     df.columns = [str(c).replace('\n', ' ').strip() for c in df.columns]
 
@@ -208,7 +230,6 @@ def process_data(df_raw):
         'media': [c for c in df.columns if 'MÉDIA' in c.upper() and 'FEV' in c.upper()],
     }
 
-    # Mapear para nomes simples
     col_names = {}
     for key, cols in nec_cols.items():
         if cols:
@@ -329,7 +350,7 @@ def create_thickness_chart(df, col_media):
 def create_progress_chart(df_formulas):
     """Gráfico de progresso de análise por unidade."""
     unidades = []
-    for i in range(4):
+    for i in range(min(4, len(df_formulas))):
         row = df_formulas.iloc[i]
         if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip():
             unidades.append({
@@ -371,6 +392,8 @@ def create_progress_chart(df_formulas):
 def create_ganho_pie(df_u):
     """Gráfico de ganho financeiro por unidade."""
     df_ganho = df_u[df_u['ganho'] > 0]
+    if len(df_ganho) == 0:
+        return None
     fig = go.Figure(data=[go.Pie(
         labels=df_ganho['unidade'],
         values=df_ganho['ganho'],
@@ -392,7 +415,55 @@ def create_ganho_pie(df_u):
 # APLICAÇÃO PRINCIPAL
 # ============================================================
 def main():
-    # Header
+    # ============================================================
+    # SIDEBAR — Fonte de dados
+    # ============================================================
+    with st.sidebar:
+        st.markdown("""
+        <div style="text-align:center; padding:16px 0;">
+            <span style="font-size:40px;">🏭</span>
+            <h2 style="margin:8px 0 4px 0; font-size:18px; color:#00D4FF !important;">Dashboard BSW</h2>
+            <p style="color:#546E7A; font-size:12px; margin:0;">Controle de Matéria-Prima</p>
+        </div>
+        <hr style="border-color:#1E3A5F; margin:8px 0 16px 0;">
+        """, unsafe_allow_html=True)
+
+        st.markdown("#### Fonte de Dados")
+        fonte = st.radio(
+            "Selecione como carregar os dados:",
+            ["📤 Upload Manual", "☁️ SharePoint (automático)"],
+            index=0,
+            help="Use o upload manual enquanto o acesso ao SharePoint não estiver liberado."
+        )
+
+        uploaded_file = None
+        if "Upload" in fonte:
+            st.markdown("---")
+            st.markdown("#### Enviar Arquivo Excel")
+            uploaded_file = st.file_uploader(
+                "Arraste ou clique para enviar o arquivo",
+                type=["xlsx", "xls"],
+                help="Envie o arquivo 'Controle Resumo - Base BSW.xlsx'",
+            )
+            if uploaded_file:
+                st.success(f"Arquivo carregado: **{uploaded_file.name}**")
+            else:
+                st.info("Aguardando arquivo...")
+
+        st.markdown("---")
+        st.markdown("""
+        <div style="padding:8px; background:#162236; border-radius:8px; border:1px solid #1E3A5F; margin-top:8px;">
+            <p style="color:#546E7A; font-size:11px; margin:0;">
+                <b style="color:#B0BEC5;">Dica:</b> Quando o acesso ao SharePoint for liberado, 
+                selecione "SharePoint" e o dashboard atualizará automaticamente 
+                sempre que o arquivo for modificado.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ============================================================
+    # HEADER
+    # ============================================================
     st.markdown("""
     <div style="display:flex; align-items:center; gap:16px; margin-bottom:8px;">
         <div style="background:#162236; border:1px solid #1E3A5F; border-radius:12px; padding:12px; display:flex; align-items:center; justify-content:center;">
@@ -405,22 +476,47 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # Carregar dados
-    try:
-        with st.spinner("Conectando ao SharePoint e carregando dados..."):
-            df_raw, df_formulas = load_data_from_sharepoint()
-            df, col_names = process_data(df_raw)
-    except Exception as e:
-        st.error(f"Erro ao conectar ao SharePoint: {str(e)}")
-        st.info("Verifique as credenciais no arquivo secrets.toml")
-        st.stop()
+    # ============================================================
+    # CARREGAR DADOS
+    # ============================================================
+    df_raw = None
+    df_formulas = None
+
+    if "Upload" in fonte:
+        if uploaded_file is None:
+            st.markdown("""
+            <div style="text-align:center; padding:80px 20px; background:#162236; border:2px dashed #1E3A5F; border-radius:16px; margin:40px auto; max-width:600px;">
+                <span style="font-size:64px;">📊</span>
+                <h2 style="color:#00D4FF !important; margin:16px 0 8px 0;">Envie seu arquivo Excel</h2>
+                <p style="color:#546E7A; font-size:14px;">Use o painel lateral à esquerda para fazer upload do arquivo<br><b style="color:#B0BEC5;">Controle Resumo - Base BSW.xlsx</b></p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+        else:
+            try:
+                df_raw, df_formulas = load_data_from_upload(uploaded_file)
+            except Exception as e:
+                st.error(f"Erro ao ler o arquivo: {str(e)}")
+                st.info("Verifique se o arquivo possui as abas 'Controle' e 'Formulas'.")
+                st.stop()
+    else:
+        try:
+            with st.spinner("Conectando ao SharePoint e carregando dados..."):
+                df_raw, df_formulas = load_data_from_sharepoint()
+        except Exception as e:
+            st.error(f"Erro ao conectar ao SharePoint: {str(e)}")
+            st.info("Verifique as credenciais ou use o Upload Manual no painel lateral.")
+            st.stop()
+
+    # Processar dados
+    df, col_names = process_data(df_raw)
 
     col_media = col_names.get('media', '')
     if not col_media:
-        st.error("Coluna de necessidade média não encontrada.")
+        st.error("Coluna de necessidade média não encontrada no arquivo.")
         st.stop()
 
-    # Timestamp de atualização
+    # Timestamp
     st.markdown(f"""
     <p style="text-align:right; color:#546E7A; font-size:12px; font-family:Consolas,monospace;">
         Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M')}
@@ -436,7 +532,7 @@ def main():
     with k2:
         st.metric("Necessidade Média/Mês", f"{df[col_media].sum():,.0f} ton".replace(",", "."))
     with k3:
-        st.metric("Clientes Ativos", f"{df['Cliente'].nunique()}")
+        st.metric("Clientes Distintos", f"{df['Cliente'].nunique()}")
     with k4:
         ganho_total = df_formulas.iloc[4, 5] if len(df_formulas) > 4 and pd.notna(df_formulas.iloc[4, 5]) else 0
         st.metric("Ganho Potencial", f"R$ {ganho_total:,.0f}".replace(",", "."))
@@ -462,7 +558,7 @@ def main():
 
         col_c, col_d = st.columns(2)
         with col_c:
-            fig_clientes = create_bar_chart(df, col_media, "Top 15 Clientes", "Cliente", 15, COLORS["cyan"])
+            fig_clientes = create_bar_chart(df, col_media, "Top 15 Clientes (Distintos)", "Cliente", 15, COLORS["cyan"])
             st.plotly_chart(fig_clientes, use_container_width=True)
         with col_d:
             usina_col = [c for c in df.columns if 'Usina' in c and 'Refer' in c]
@@ -481,13 +577,14 @@ def main():
 
         # Tabela Top 15 Bobinas
         st.markdown("### Top 15 Bobinas por Necessidade Média")
-        codigo_col = [c for c in df.columns if 'Código' in c and 'Bobina' in c][0]
-        top15 = df.nlargest(15, col_media)[[codigo_col, 'Tipo', 'Cliente', 'Projeto', col_media]].copy()
-        top15.columns = ['Código', 'Tipo', 'Cliente', 'Projeto', 'Necessidade Média (ton)']
-        top15['Necessidade Média (ton)'] = top15['Necessidade Média (ton)'].round(1)
-        top15 = top15.reset_index(drop=True)
-        top15.index = top15.index + 1
-        st.dataframe(top15, use_container_width=True, height=560)
+        codigo_col = [c for c in df.columns if 'Código' in c and 'Bobina' in c]
+        if codigo_col:
+            top15 = df.nlargest(15, col_media)[[codigo_col[0], 'Tipo', 'Cliente', 'Projeto', col_media]].copy()
+            top15.columns = ['Código', 'Tipo', 'Cliente', 'Projeto', 'Necessidade Média (ton)']
+            top15['Necessidade Média (ton)'] = top15['Necessidade Média (ton)'].round(1)
+            top15 = top15.reset_index(drop=True)
+            top15.index = top15.index + 1
+            st.dataframe(top15, use_container_width=True, height=560)
 
     # ----------------------------------------------------------
     # ABA 2: ANÁLISES
@@ -527,20 +624,20 @@ def main():
         col_i, col_j = st.columns(2)
         with col_i:
             fig_ganho = create_ganho_pie(df_u)
-            st.plotly_chart(fig_ganho, use_container_width=True)
+            if fig_ganho:
+                st.plotly_chart(fig_ganho, use_container_width=True)
         with col_j:
             # Ganho por usina
             usina_data = []
-            for i in range(7, 40):
-                if i < len(df_formulas):
-                    row = df_formulas.iloc[i]
-                    if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() and str(row.iloc[0]) != 'Total':
-                        ganho_val = float(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
-                        if ganho_val > 0:
-                            usina_data.append({
-                                'usina': str(row.iloc[0]),
-                                'ganho': ganho_val,
-                            })
+            for i in range(7, min(40, len(df_formulas))):
+                row = df_formulas.iloc[i]
+                if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() and str(row.iloc[0]) != 'Total':
+                    ganho_val = float(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
+                    if ganho_val > 0:
+                        usina_data.append({
+                            'usina': str(row.iloc[0]),
+                            'ganho': ganho_val,
+                        })
 
             if usina_data:
                 df_usina_ganho = pd.DataFrame(usina_data).sort_values('ganho', ascending=True)
