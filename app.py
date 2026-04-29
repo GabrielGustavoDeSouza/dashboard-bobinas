@@ -596,9 +596,18 @@ def main():
             bobinas_val = row.get('Q. Bobinas', row.iloc[1]) if 'Q. Bobinas' in df_formulas.columns else row.iloc[1]
             peso_val = row.get('Peso medio total', row.iloc[2]) if 'Peso medio total' in df_formulas.columns else row.iloc[2]
             ganho_val = row.get('Ganho Financeiro', row.iloc[5]) if 'Ganho Financeiro' in df_formulas.columns else row.iloc[5]
-            total_bobinas += int(bobinas_val) if pd.notna(bobinas_val) else 0
-            total_peso_medio += float(peso_val) if pd.notna(peso_val) else 0
-            total_ganho += float(ganho_val) if pd.notna(ganho_val) else 0
+            try:
+                total_bobinas += int(float(bobinas_val)) if pd.notna(bobinas_val) else 0
+            except (ValueError, TypeError):
+                pass
+            try:
+                total_peso_medio += float(peso_val) if pd.notna(peso_val) else 0
+            except (ValueError, TypeError):
+                pass
+            try:
+                total_ganho += float(ganho_val) if pd.notna(ganho_val) else 0
+            except (ValueError, TypeError):
+                pass
 
     # Contar unidades distintas da aba Formulas
     n_unidades = sum(1 for i in range(len(df_formulas))
