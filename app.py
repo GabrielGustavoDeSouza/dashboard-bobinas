@@ -147,8 +147,6 @@ PLOTLY_LAYOUT = dict(
         borderwidth=1,
         font=dict(color="#B0BEC5"),
     ),
-    xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-    yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
 )
 
 # ============================================================
@@ -205,23 +203,20 @@ def load_data_from_sharepoint():
 
 def smart_read_excel(excel_bytes, sheet_name):
     """Lê uma aba do Excel detectando automaticamente a linha do cabeçalho."""
-    # Tenta ler normalmente primeiro
     df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=0)
-    
+
     # Se todas as colunas são 'Unnamed', o cabeçalho real está em outra linha
     unnamed_count = sum(1 for c in df.columns if str(c).startswith('Unnamed'))
     if unnamed_count > len(df.columns) * 0.5:
-        # Procurar a linha que contém o cabeçalho real (até as primeiras 5 linhas)
         excel_bytes.seek(0)
         df_raw = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=None)
         for row_idx in range(min(5, len(df_raw))):
             row_vals = [str(v).replace('\n', ' ').strip() for v in df_raw.iloc[row_idx] if pd.notna(v)]
-            # Verificar se esta linha parece um cabeçalho
             if any('Código' in v or 'Bobina' in v or 'NECESSIDADE' in v or 'Tipo' in v for v in row_vals):
                 excel_bytes.seek(0)
                 df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=row_idx)
                 break
-    
+
     return df
 
 
@@ -246,11 +241,11 @@ def process_data(df_raw):
 
     # Colunas de necessidade
     nec_cols = {
-        'jan': [c for c in df.columns if 'Janeiro' in c],
-        'fev': [c for c in df.columns if 'Fevereiro' in c],
-        'mar': [c for c in df.columns if 'Março' in c or 'Marco' in c],
-        'abr': [c for c in df.columns if 'Abril' in c],
-        'mai': [c for c in df.columns if 'Maio' in c],
+        'jan': [c for c in df.columns if 'Janeiro' in c and 'MÉDIA' not in c.upper()],
+        'fev': [c for c in df.columns if 'Fevereiro' in c and 'MÉDIA' not in c.upper()],
+        'mar': [c for c in df.columns if ('Março' in c or 'Marco' in c) and 'MÉDIA' not in c.upper()],
+        'abr': [c for c in df.columns if 'Abril' in c and 'MÉDIA' not in c.upper()],
+        'mai': [c for c in df.columns if 'Maio' in c and 'MÉDIA' not in c.upper()],
         'media': [c for c in df.columns if 'MÉDIA' in c.upper() and 'FEV' in c.upper()],
     }
 
@@ -258,6 +253,10 @@ def process_data(df_raw):
     for key, cols in nec_cols.items():
         if cols:
             col_names[key] = cols[0]
+
+    # Converter colunas numéricas
+    for key, col in col_names.items():
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
     return df, col_names
 
@@ -289,7 +288,8 @@ def create_area_chart(df, col_names):
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Evolução da Necessidade Mensal", font=dict(size=16, color=COLORS["cyan"])),
-        yaxis_title="Toneladas",
+        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
         height=400,
     )
     return fig
@@ -297,7 +297,12 @@ def create_area_chart(df, col_names):
 
 def create_pie_chart(df, col_media, title, group_col, top_n=10):
     """Gráfico de pizza/donut."""
-    dist = df.groupby(group_col)[col_media].sum().sort_values(ascending=False).head(top_n)
+    # Filtrar valores válidos
+    df_valid = df[df[group_col].notna() & (df[group_col] != '')].copy()
+    if len(df_valid) == 0:
+        return go.Figure().update_layout(**PLOTLY_LAYOUT, title=dict(text=title))
+
+    dist = df_valid.groupby(group_col)[col_media].sum().sort_values(ascending=False).head(top_n)
     fig = go.Figure(data=[go.Pie(
         labels=dist.index,
         values=dist.values,
@@ -311,31 +316,45 @@ def create_pie_chart(df, col_media, title, group_col, top_n=10):
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
         height=400,
-        showlegend=True,
     )
     return fig
 
 
 def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None, orientation='h'):
     """Gráfico de barras horizontal."""
-    dist = df.groupby(group_col)[col_media].sum().sort_values(ascending=True).tail(top_n)
-    fig = go.Figure(data=[go.Bar(
-        x=dist.values if orientation == 'h' else dist.index,
-        y=dist.index if orientation == 'h' else dist.values,
-        orientation=orientation,
-        marker=dict(
-            color=color or COLORS["cyan"],
-            line=dict(width=0),
-        ),
-        hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>' if orientation == 'h'
-        else '%{x}<br><b>%{y:,.1f} ton</b><extra></extra>',
-    )])
+    # Filtrar valores válidos no group_col
+    df_valid = df[df[group_col].notna() & (df[group_col] != '')].copy()
+    if len(df_valid) == 0:
+        fig = go.Figure()
+        fig.update_layout(**PLOTLY_LAYOUT, title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])))
+        return fig
+
+    dist = df_valid.groupby(group_col)[col_media].sum().sort_values(ascending=True).tail(top_n)
+
+    if orientation == 'h':
+        fig = go.Figure(data=[go.Bar(
+            x=dist.values,
+            y=dist.index,
+            orientation='h',
+            marker=dict(color=color or COLORS["cyan"], line=dict(width=0)),
+            hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>',
+        )])
+    else:
+        fig = go.Figure(data=[go.Bar(
+            x=dist.index,
+            y=dist.values,
+            orientation='v',
+            marker=dict(color=color or COLORS["cyan"], line=dict(width=0)),
+            hovertemplate='%{x}<br><b>%{y:,.1f} ton</b><extra></extra>',
+        )])
+
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
         height=max(400, top_n * 30),
         yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas" if orientation == 'h' else None),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F",
+                   title="Toneladas" if orientation == 'h' else None),
     )
     return fig
 
@@ -348,43 +367,56 @@ def create_thickness_chart(df, col_media):
 
     df_temp = df.copy()
     df_temp['esp_num'] = pd.to_numeric(df_temp[esp_col[0]], errors='coerce')
-    bins = [0, 1, 2, 4, 6, 8, 10, 15, 20]
-    labels = ['0-1mm', '1-2mm', '2-4mm', '4-6mm', '6-8mm', '8-10mm', '10-15mm', '15-20mm']
+    df_temp = df_temp[df_temp['esp_num'].notna()]
+    if len(df_temp) == 0:
+        return None
+
+    bins = [0, 1, 2, 4, 6, 8, 10, 15, 20, 50]
+    labels = ['0-1mm', '1-2mm', '2-4mm', '4-6mm', '6-8mm', '8-10mm', '10-15mm', '15-20mm', '20+mm']
     df_temp['faixa'] = pd.cut(df_temp['esp_num'], bins=bins, labels=labels, right=True)
     dist = df_temp.groupby('faixa', observed=True)[col_media].sum().sort_index()
+    dist = dist[dist > 0]
 
     fig = go.Figure(data=[go.Bar(
         x=[str(x) for x in dist.index],
         y=dist.values,
-        marker=dict(
-            color=CHART_COLORS[:len(dist)],
-            line=dict(width=0),
-        ),
+        marker=dict(color=CHART_COLORS[:len(dist)], line=dict(width=0)),
         hovertemplate='%{x}<br><b>%{y:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Faixa de Espessura", font=dict(size=16, color=COLORS["cyan"])),
-        yaxis_title="Toneladas",
+        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
         height=400,
     )
     return fig
 
 
 def create_progress_chart(df_formulas):
-    """Gráfico de progresso de análise por unidade."""
+    """Gráfico de progresso de análise por unidade — puxa direto da aba Formulas."""
     unidades = []
-    for i in range(min(4, len(df_formulas))):
+    for i in range(len(df_formulas)):
         row = df_formulas.iloc[i]
-        if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip():
+        nome = row.get('Unidades', row.iloc[0]) if 'Unidades' in df_formulas.columns else row.iloc[0]
+        if pd.notna(nome) and str(nome).strip() and str(nome).lower() not in ['total', 'nan', '']:
+            bobinas = row.get('Q. Bobinas', row.iloc[1]) if 'Q. Bobinas' in df_formulas.columns else row.iloc[1]
+            peso_total = row.get('Peso medio total', row.iloc[2]) if 'Peso medio total' in df_formulas.columns else row.iloc[2]
+            peso_analisado = row.get('Peso análisado', row.iloc[3]) if 'Peso análisado' in df_formulas.columns else row.iloc[3]
+            pct = row.get('Análises Concluidas (P)', row.iloc[4]) if 'Análises Concluidas (P)' in df_formulas.columns else row.iloc[4]
+            ganho = row.get('Ganho Financeiro', row.iloc[5]) if 'Ganho Financeiro' in df_formulas.columns else row.iloc[5]
+
             unidades.append({
-                'unidade': str(row.iloc[0]),
-                'bobinas': int(row.iloc[1]) if pd.notna(row.iloc[1]) else 0,
-                'peso_total': float(row.iloc[2]) if pd.notna(row.iloc[2]) else 0,
-                'peso_analisado': float(row.iloc[3]) if pd.notna(row.iloc[3]) else 0,
-                'pct': float(row.iloc[4]) * 100 if pd.notna(row.iloc[4]) else 0,
-                'ganho': float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0,
+                'unidade': str(nome).strip(),
+                'bobinas': int(bobinas) if pd.notna(bobinas) else 0,
+                'peso_total': float(peso_total) if pd.notna(peso_total) else 0,
+                'peso_analisado': float(peso_analisado) if pd.notna(peso_analisado) else 0,
+                'pct': float(pct) * 100 if pd.notna(pct) and float(pct) <= 1 else (float(pct) if pd.notna(pct) else 0),
+                'ganho': float(ganho) if pd.notna(ganho) else 0,
             })
+
+    if not unidades:
+        return go.Figure().update_layout(**PLOTLY_LAYOUT), pd.DataFrame()
 
     df_u = pd.DataFrame(unidades)
 
@@ -407,7 +439,8 @@ def create_progress_chart(df_formulas):
         **PLOTLY_LAYOUT,
         title=dict(text="Peso Total vs Analisado por Unidade", font=dict(size=16, color=COLORS["cyan"])),
         barmode='group',
-        yaxis_title="Toneladas",
+        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
         height=400,
     )
     return fig, df_u
@@ -415,6 +448,8 @@ def create_progress_chart(df_formulas):
 
 def create_ganho_pie(df_u):
     """Gráfico de ganho financeiro por unidade."""
+    if len(df_u) == 0:
+        return None
     df_ganho = df_u[df_u['ganho'] > 0]
     if len(df_ganho) == 0:
         return None
@@ -422,7 +457,7 @@ def create_ganho_pie(df_u):
         labels=df_ganho['unidade'],
         values=df_ganho['ganho'],
         hole=0.45,
-        marker=dict(colors=[COLORS["cyan"], COLORS["amber"], COLORS["emerald"], COLORS["coral"]]),
+        marker=dict(colors=[COLORS["cyan"], COLORS["amber"], COLORS["emerald"], COLORS["coral"], COLORS["purple"]]),
         textinfo='percent+label',
         textfont=dict(size=11, color="#ECEFF1"),
         hovertemplate='%{label}<br><b>R$ %{value:,.0f}</b><br>%{percent}<extra></extra>',
@@ -548,18 +583,39 @@ def main():
     """, unsafe_allow_html=True)
 
     # ============================================================
-    # KPIs
+    # KPIs — Puxando da aba Formulas para consistência
     # ============================================================
+    # Calcular totais da aba Formulas
+    total_bobinas = 0
+    total_peso_medio = 0
+    total_ganho = 0
+    for i in range(len(df_formulas)):
+        row = df_formulas.iloc[i]
+        nome = row.get('Unidades', row.iloc[0]) if 'Unidades' in df_formulas.columns else row.iloc[0]
+        if pd.notna(nome) and str(nome).strip() and str(nome).lower() not in ['total', 'nan', '']:
+            bobinas_val = row.get('Q. Bobinas', row.iloc[1]) if 'Q. Bobinas' in df_formulas.columns else row.iloc[1]
+            peso_val = row.get('Peso medio total', row.iloc[2]) if 'Peso medio total' in df_formulas.columns else row.iloc[2]
+            ganho_val = row.get('Ganho Financeiro', row.iloc[5]) if 'Ganho Financeiro' in df_formulas.columns else row.iloc[5]
+            total_bobinas += int(bobinas_val) if pd.notna(bobinas_val) else 0
+            total_peso_medio += float(peso_val) if pd.notna(peso_val) else 0
+            total_ganho += float(ganho_val) if pd.notna(ganho_val) else 0
+
+    # Contar unidades distintas da aba Formulas
+    n_unidades = sum(1 for i in range(len(df_formulas))
+                     if pd.notna(df_formulas.iloc[i, 0])
+                     and str(df_formulas.iloc[i, 0]).strip()
+                     and str(df_formulas.iloc[i, 0]).lower() not in ['total', 'nan', ''])
+
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        st.metric("Total de Bobinas", f"{len(df):,}".replace(",", "."))
+        st.metric("Total de Bobinas", f"{total_bobinas:,}".replace(",", "."))
     with k2:
-        st.metric("Necessidade Média/Mês", f"{df[col_media].sum():,.0f} ton".replace(",", "."))
+        nec_media_total = df[col_media].sum()
+        st.metric("Necessidade Média/Mês", f"{nec_media_total:,.0f} ton".replace(",", "."))
     with k3:
-        st.metric("Clientes Distintos", f"{df['Cliente'].nunique()}")
+        st.metric("Unidades Delga", f"{n_unidades}")
     with k4:
-        ganho_total = df_formulas.iloc[4, 5] if len(df_formulas) > 4 and pd.notna(df_formulas.iloc[4, 5]) else 0
-        st.metric("Ganho Potencial", f"R$ {ganho_total:,.0f}".replace(",", "."))
+        st.metric("Ganho Potencial", f"R$ {total_ganho:,.0f}".replace(",", "."))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -577,18 +633,20 @@ def main():
             fig_area = create_area_chart(df, col_names)
             st.plotly_chart(fig_area, use_container_width=True)
         with col_b:
-            fig_tipo = create_pie_chart(df, col_media, "Distribuição por Tipo", "Tipo")
-            st.plotly_chart(fig_tipo, use_container_width=True)
+            if 'Tipo' in df.columns:
+                fig_tipo = create_pie_chart(df, col_media, "Distribuição por Tipo", "Tipo")
+                st.plotly_chart(fig_tipo, use_container_width=True)
 
         col_c, col_d = st.columns(2)
         with col_c:
-            fig_clientes = create_bar_chart(df, col_media, "Top 15 Clientes (Distintos)", "Cliente", 15, COLORS["cyan"])
-            st.plotly_chart(fig_clientes, use_container_width=True)
-        with col_d:
             usina_col = [c for c in df.columns if 'Usina' in c and 'Refer' in c]
             if usina_col:
                 fig_usinas = create_bar_chart(df, col_media, "Top 10 Usinas", usina_col[0], 10, COLORS["emerald"])
                 st.plotly_chart(fig_usinas, use_container_width=True)
+        with col_d:
+            if 'Projeto' in df.columns:
+                fig_proj = create_bar_chart(df, col_media, "Top 12 Projetos", "Projeto", 12, COLORS["purple"])
+                st.plotly_chart(fig_proj, use_container_width=True)
 
         col_e, col_f = st.columns(2)
         with col_e:
@@ -596,15 +654,23 @@ def main():
             if fig_esp:
                 st.plotly_chart(fig_esp, use_container_width=True)
         with col_f:
-            fig_proj = create_bar_chart(df, col_media, "Top 12 Projetos", "Projeto", 12, COLORS["purple"])
-            st.plotly_chart(fig_proj, use_container_width=True)
+            unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
+            if unidade_col:
+                fig_unid = create_pie_chart(df, col_media, "Distribuição por Unidade Delga", unidade_col[0], 6)
+                st.plotly_chart(fig_unid, use_container_width=True)
 
         # Tabela Top 15 Bobinas
         st.markdown("### Top 15 Bobinas por Necessidade Média")
         codigo_col = [c for c in df.columns if 'Código' in c and 'Bobina' in c]
         if codigo_col:
-            top15 = df.nlargest(15, col_media)[[codigo_col[0], 'Tipo', 'Cliente', 'Projeto', col_media]].copy()
-            top15.columns = ['Código', 'Tipo', 'Cliente', 'Projeto', 'Necessidade Média (ton)']
+            display_cols = [codigo_col[0], 'Tipo']
+            if 'Projeto' in df.columns:
+                display_cols.append('Projeto')
+            display_cols.append(col_media)
+
+            top15 = df.nlargest(15, col_media)[display_cols].copy()
+            col_rename = {codigo_col[0]: 'Código', col_media: 'Necessidade Média (ton)'}
+            top15 = top15.rename(columns=col_rename)
             top15['Necessidade Média (ton)'] = top15['Necessidade Média (ton)'].round(1)
             top15 = top15.reset_index(drop=True)
             top15.index = top15.index + 1
@@ -619,27 +685,39 @@ def main():
 
         # Tabela de progresso
         st.markdown("### Progresso de Análise por Unidade")
-        df_display = df_u.copy()
-        df_display.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
-        df_display['Peso Total (ton)'] = df_display['Peso Total (ton)'].round(1)
-        df_display['Peso Analisado (ton)'] = df_display['Peso Analisado (ton)'].round(1)
-        df_display['% Concluído'] = df_display['% Concluído'].round(1)
-        df_display['Ganho (R$)'] = df_display['Ganho (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        if len(df_u) > 0:
+            df_display = df_u.copy()
+            df_display.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
+            df_display['Peso Total (ton)'] = df_display['Peso Total (ton)'].round(1)
+            df_display['Peso Analisado (ton)'] = df_display['Peso Analisado (ton)'].round(1)
+            df_display['% Concluído'] = df_display['% Concluído'].round(1)
+            df_display['Ganho (R$)'] = df_display['Ganho (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        # Distribuição por unidade
-        st.markdown("### Necessidade por Unidade Delga")
+        # Distribuição por unidade e beneficiador
+        st.markdown("### Necessidade por Unidade e Beneficiador")
         unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
-        if unidade_col:
+        benef_col = [c for c in df.columns if 'Beneficiador' in c]
+        if unidade_col or benef_col:
             col_g, col_h = st.columns(2)
             with col_g:
-                fig_unid = create_pie_chart(df, col_media, "Distribuição por Unidade", unidade_col[0], 5)
-                st.plotly_chart(fig_unid, use_container_width=True)
+                if unidade_col:
+                    fig_unid2 = create_bar_chart(df, col_media, "Necessidade por Unidade Delga", unidade_col[0], 6, COLORS["cyan"])
+                    st.plotly_chart(fig_unid2, use_container_width=True)
             with col_h:
-                benef_col = [c for c in df.columns if 'Beneficiador' in c]
                 if benef_col:
                     fig_benef = create_bar_chart(df, col_media, "Necessidade por Beneficiador", benef_col[0], 10, COLORS["teal"])
                     st.plotly_chart(fig_benef, use_container_width=True)
+
+        # Classificação ABC
+        if 'ABC' in df.columns:
+            st.markdown("### Classificação ABC")
+            df_abc = df[df['ABC'].notna() & (df['ABC'] != '')].copy()
+            if len(df_abc) > 0:
+                abc_dist = df_abc.groupby('ABC')[col_media].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                abc_dist.columns = ['Necessidade Total (ton)', 'Qtd Bobinas']
+                abc_dist['Necessidade Total (ton)'] = abc_dist['Necessidade Total (ton)'].round(1)
+                st.dataframe(abc_dist, use_container_width=True)
 
     # ----------------------------------------------------------
     # ABA 3: FINANCEIRO
@@ -647,44 +725,39 @@ def main():
     with tab3:
         col_i, col_j = st.columns(2)
         with col_i:
-            fig_ganho = create_ganho_pie(df_u)
-            if fig_ganho:
-                st.plotly_chart(fig_ganho, use_container_width=True)
+            if len(df_u) > 0:
+                fig_ganho = create_ganho_pie(df_u)
+                if fig_ganho:
+                    st.plotly_chart(fig_ganho, use_container_width=True)
+                else:
+                    st.info("Nenhum ganho financeiro registrado ainda. Os dados aparecerão conforme as análises forem concluídas.")
         with col_j:
-            # Ganho por usina
-            usina_data = []
-            for i in range(7, min(40, len(df_formulas))):
-                row = df_formulas.iloc[i]
-                if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() and str(row.iloc[0]) != 'Total':
-                    ganho_val = float(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
-                    if ganho_val > 0:
-                        usina_data.append({
-                            'usina': str(row.iloc[0]),
-                            'ganho': ganho_val,
-                        })
-
-            if usina_data:
-                df_usina_ganho = pd.DataFrame(usina_data).sort_values('ganho', ascending=True)
-                fig_usina_g = go.Figure(data=[go.Bar(
-                    x=df_usina_ganho['ganho'],
-                    y=df_usina_ganho['usina'],
+            # Ganho por unidade em barras
+            if len(df_u) > 0 and df_u['ganho'].sum() > 0:
+                df_ganho_bar = df_u[df_u['ganho'] > 0].sort_values('ganho', ascending=True)
+                fig_ganho_bar = go.Figure(data=[go.Bar(
+                    x=df_ganho_bar['ganho'],
+                    y=df_ganho_bar['unidade'],
                     orientation='h',
                     marker=dict(color=COLORS["amber"]),
                     hovertemplate='%{y}<br><b>R$ %{x:,.0f}</b><extra></extra>',
                 )])
-                fig_usina_g.update_layout(
+                fig_ganho_bar.update_layout(
                     **PLOTLY_LAYOUT,
-                    title=dict(text="Ganho Financeiro por Usina", font=dict(size=16, color=COLORS["cyan"])),
-                    xaxis_title="R$",
+                    title=dict(text="Ganho Financeiro por Unidade (R$)", font=dict(size=16, color=COLORS["cyan"])),
+                    xaxis=dict(title="R$", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+                    yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
                     height=400,
                 )
-                st.plotly_chart(fig_usina_g, use_container_width=True)
+                st.plotly_chart(fig_ganho_bar, use_container_width=True)
+            else:
+                st.info("Ganho financeiro aparecerá conforme as análises forem concluídas.")
 
         # Resumo financeiro
         st.markdown("### Resumo Financeiro por Unidade")
         if len(df_u) > 0:
-            df_fin = df_u[['unidade', 'peso_total', 'peso_analisado', 'pct', 'ganho']].copy()
-            df_fin.columns = ['Unidade', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
+            df_fin = df_u[['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']].copy()
+            df_fin.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
             df_fin['Peso Total (ton)'] = df_fin['Peso Total (ton)'].round(1)
             df_fin['Peso Analisado (ton)'] = df_fin['Peso Analisado (ton)'].round(1)
             df_fin['% Concluído'] = df_fin['% Concluído'].round(1)
