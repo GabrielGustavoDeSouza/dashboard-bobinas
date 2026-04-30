@@ -1,7 +1,8 @@
 """
 Dashboard de Controle de Matéria-Prima — Bobinas BSW
-Lê o arquivo Excel diretamente do SharePoint via Microsoft Graph API
-ou permite upload manual do arquivo.
+- Visitantes veem os dados automaticamente (sem upload)
+- Admin atualiza os dados via upload protegido por senha
+- Dados persistem no GitHub (não somem quando o app dorme)
 """
 import streamlit as st
 import pandas as pd
@@ -9,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import io
+import base64
 from datetime import datetime
 
 # ============================================================
@@ -62,10 +64,10 @@ st.markdown("""
 # CORES POR UNIDADE DELGA (padronizadas)
 # ============================================================
 UNIDADE_COLORS = {
-    "Ferraz":  "#1E88E5",   # Azul
-    "Diadema": "#43A047",   # Verde
-    "Jarinu":  "#FB8C00",   # Laranja
-    "Sul":     "#8E24AA",   # Roxo
+    "Ferraz":  "#1E88E5",
+    "Diadema": "#43A047",
+    "Jarinu":  "#FB8C00",
+    "Sul":     "#8E24AA",
 }
 
 COLORS = {
@@ -92,6 +94,23 @@ PLOTLY_LAYOUT = dict(
     ),
 )
 
+# ============================================================
+# CONFIGURAÇÃO DO GITHUB (para persistência de dados)
+# ============================================================
+GITHUB_REPO = "GabrielGustavoDeSouza/dashboard-bobinas"
+GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
+GITHUB_BRANCH = "main"
+
+ADMIN_PASSWORD = "M@ster"
+
+
+def get_github_token():
+    """Obtém o token do GitHub dos secrets do Streamlit."""
+    try:
+        return st.secrets["GITHUB_TOKEN"]
+    except (KeyError, FileNotFoundError):
+        return None
+
 
 def get_unidade_color(nome):
     """Retorna a cor padronizada da unidade Delga."""
@@ -104,6 +123,76 @@ def get_unidade_color(nome):
 def get_unidade_colors_list(names):
     """Retorna lista de cores para uma lista de nomes de unidades."""
     return [get_unidade_color(n) for n in names]
+
+
+# ============================================================
+# FUNÇÕES DE PERSISTÊNCIA (GitHub API)
+# ============================================================
+@st.cache_data(ttl=120)
+def load_data_from_github():
+    """Carrega o arquivo Excel salvo no repositório GitHub."""
+    token = get_github_token()
+    if not token:
+        return None, None
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_DATA_PATH}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    params = {"ref": GITHUB_BRANCH}
+
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        content = response.json()
+        file_content = base64.b64decode(content["content"])
+        excel_bytes = io.BytesIO(file_content)
+        df_controle = smart_read_excel(excel_bytes, "Controle")
+        excel_bytes.seek(0)
+        df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
+        return df_controle, df_formulas
+    return None, None
+
+
+def save_data_to_github(file_bytes, filename):
+    """Salva o arquivo Excel no repositório GitHub (cria ou atualiza)."""
+    token = get_github_token()
+    if not token:
+        return False, "Token do GitHub não configurado nos Secrets."
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_DATA_PATH}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    # Verificar se o arquivo já existe (para obter o SHA)
+    response = requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH})
+    sha = None
+    if response.status_code == 200:
+        sha = response.json()["sha"]
+
+    # Codificar o arquivo em base64
+    content_b64 = base64.b64encode(file_bytes).decode("utf-8")
+
+    # Montar o payload
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
+    payload = {
+        "message": f"Atualização de dados: {filename} ({now})",
+        "content": content_b64,
+        "branch": GITHUB_BRANCH,
+    }
+    if sha:
+        payload["sha"] = sha
+
+    # Enviar
+    response = requests.put(url, headers=headers, json=payload)
+    if response.status_code in [200, 201]:
+        # Limpar o cache para que os novos dados sejam carregados
+        load_data_from_github.clear()
+        return True, "Dados atualizados com sucesso!"
+    else:
+        return False, f"Erro ao salvar: {response.status_code} - {response.json().get('message', '')}"
 
 
 # ============================================================
@@ -205,7 +294,6 @@ def parse_formulas(df_formulas):
     unidades = []
     usinas = []
 
-    # Seção 1: Unidades (linhas 0-3, antes do 'Total')
     for i in range(min(10, len(df_formulas))):
         row = df_formulas.iloc[i]
         nome = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
@@ -243,7 +331,6 @@ def parse_formulas(df_formulas):
             'peso_analisado': peso_analisado, 'pct': pct, 'ganho': ganho,
         })
 
-    # Seção 2: Usinas
     usina_start = None
     for i in range(len(df_formulas)):
         val = str(df_formulas.iloc[i, 0]).strip().lower() if pd.notna(df_formulas.iloc[i, 0]) else ''
@@ -615,27 +702,31 @@ def main():
         <hr style="border-color:#1E3A5F; margin:8px 0 16px 0;">
         """, unsafe_allow_html=True)
 
-        st.markdown("#### Fonte de Dados")
-        fonte = st.radio(
-            "Selecione como carregar os dados:",
-            ["📤 Upload Manual", "☁️ SharePoint (automático)"],
-            index=0,
-            help="Use o upload manual enquanto o acesso ao SharePoint não estiver liberado."
-        )
-
-        uploaded_file = None
-        if "Upload" in fonte:
-            st.markdown("---")
-            st.markdown("#### Enviar Arquivo Excel")
-            uploaded_file = st.file_uploader(
-                "Arraste ou clique para enviar o arquivo",
-                type=["xlsx", "xls"],
-                help="Envie o arquivo 'Controle Resumo - Base BSW.xlsx'",
-            )
-            if uploaded_file:
-                st.success(f"Arquivo carregado: **{uploaded_file.name}**")
-            else:
-                st.info("Aguardando arquivo...")
+        # ── ÁREA ADMIN (protegida por senha) ──
+        st.markdown("#### 🔐 Área do Administrador")
+        with st.expander("Atualizar Dados (requer senha)", expanded=False):
+            senha = st.text_input("Senha:", type="password", key="admin_pwd")
+            if senha == ADMIN_PASSWORD:
+                st.success("Acesso liberado!")
+                admin_file = st.file_uploader(
+                    "Envie o Excel atualizado:",
+                    type=["xlsx", "xls"],
+                    key="admin_upload",
+                    help="O arquivo será salvo e ficará disponível para todos os visitantes.",
+                )
+                if admin_file:
+                    if st.button("📤 Salvar e Publicar Dados", type="primary"):
+                        with st.spinner("Salvando dados no servidor..."):
+                            file_bytes = admin_file.getvalue()
+                            success, msg = save_data_to_github(file_bytes, admin_file.name)
+                        if success:
+                            st.success(f"✅ {msg}")
+                            st.info("Os dados já estão disponíveis para todos os visitantes!")
+                            st.balloons()
+                        else:
+                            st.error(f"❌ {msg}")
+            elif senha and senha != ADMIN_PASSWORD:
+                st.error("Senha incorreta.")
 
         st.markdown("---")
 
@@ -653,8 +744,8 @@ def main():
         st.markdown("""
         <div style="padding:8px; background:#162236; border-radius:8px; border:1px solid #1E3A5F; margin-top:8px;">
             <p style="color:#546E7A; font-size:11px; margin:0;">
-                <b style="color:#B0BEC5;">Dica:</b> Quando o acesso ao SharePoint for liberado, 
-                selecione "SharePoint" e o dashboard atualizará automaticamente.
+                <b style="color:#B0BEC5;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
+                <b style="color:#B0BEC5;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -672,32 +763,39 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # CARREGAR DADOS
-    if "Upload" in fonte:
-        if uploaded_file is None:
-            st.markdown("""
-            <div style="text-align:center; padding:80px 20px; background:#162236; border:2px dashed #1E3A5F; border-radius:16px; margin:40px auto; max-width:600px;">
-                <span style="font-size:64px;">📊</span>
-                <h2 style="color:#00D4FF !important; margin:16px 0 8px 0;">Envie seu arquivo Excel</h2>
-                <p style="color:#546E7A; font-size:14px;">Use o painel lateral à esquerda para fazer upload do arquivo<br><b style="color:#B0BEC5;">Controle Resumo - Base BSW.xlsx</b></p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.stop()
-        else:
-            try:
-                df_raw, df_formulas = load_data_from_upload(uploaded_file)
-            except Exception as e:
-                st.error(f"Erro ao ler o arquivo: {str(e)}")
-                st.info("Verifique se o arquivo possui as abas 'Controle' e 'Formulas'.")
-                st.stop()
-    else:
+    # ============================================================
+    # CARREGAR DADOS (prioridade: GitHub > SharePoint > vazio)
+    # ============================================================
+    df_raw = None
+    df_formulas = None
+
+    # Tentar carregar do GitHub (dados persistidos)
+    try:
+        df_raw, df_formulas = load_data_from_github()
+    except Exception:
+        df_raw, df_formulas = None, None
+
+    # Se não tem dados no GitHub, tentar SharePoint
+    if df_raw is None:
         try:
-            with st.spinner("Conectando ao SharePoint e carregando dados..."):
-                df_raw, df_formulas = load_data_from_sharepoint()
-        except Exception as e:
-            st.error(f"Erro ao conectar ao SharePoint: {str(e)}")
-            st.info("Verifique as credenciais ou use o Upload Manual no painel lateral.")
-            st.stop()
+            df_raw, df_formulas = load_data_from_sharepoint()
+        except Exception:
+            df_raw, df_formulas = None, None
+
+    # Se não tem dados de nenhuma fonte
+    if df_raw is None:
+        st.markdown("""
+        <div style="text-align:center; padding:80px 20px; background:#162236; border:2px dashed #1E3A5F; border-radius:16px; margin:40px auto; max-width:600px;">
+            <span style="font-size:64px;">📊</span>
+            <h2 style="color:#00D4FF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
+            <p style="color:#546E7A; font-size:14px;">
+                Nenhum dado disponível ainda.<br><br>
+                <b style="color:#B0BEC5;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral<br>
+                para enviar o arquivo Excel pela primeira vez.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
 
     # Processar dados
     df, col_names = process_data(df_raw)
@@ -734,7 +832,7 @@ def main():
         st.metric("Ganho Potencial", f"R$ {total_ganho:,.0f}".replace(",", "."))
 
     # ============================================================
-    # SELETOR DE UNIDADE — KPIs por unidade
+    # SELETOR DE UNIDADE
     # ============================================================
     if len(df_unidades) > 0:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -835,7 +933,6 @@ def main():
             if not render_chart(fig_prog):
                 st.info("Sem dados de progresso.")
 
-            # Tabela de progresso
             st.markdown("### Progresso de Análise por Unidade")
             df_display = df_unidades.copy()
             df_display.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
@@ -847,7 +944,6 @@ def main():
         else:
             st.info("Dados de análise não encontrados na aba Formulas.")
 
-        # Distribuição por unidade e beneficiador
         st.markdown("### Necessidade por Unidade e Beneficiador")
         col_g, col_h = st.columns(2)
         with col_g:
@@ -863,7 +959,6 @@ def main():
             else:
                 st.info("Coluna 'Beneficiador' não encontrada.")
 
-        # Classificação ABC
         abc_col = [c for c in df.columns if c.strip().upper() == 'ABC']
         if abc_col:
             st.markdown("### Classificação ABC")
@@ -886,7 +981,6 @@ def main():
                 with col_j:
                     render_chart(create_ganho_unidade_chart(df_unidades))
 
-                # Usinas com ganho
                 if len(df_usinas) > 0 and df_usinas['ganho'].sum() > 0:
                     st.markdown("### Ganho Financeiro por Usina")
                     render_chart(create_ganho_usinas_chart(df_usinas))
@@ -896,7 +990,6 @@ def main():
                     "Os dados aparecerão conforme as análises forem concluídas na planilha."
                 )
 
-            # Resumo financeiro
             st.markdown("### Resumo Financeiro por Unidade")
             df_fin = df_unidades[['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']].copy()
             df_fin.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
