@@ -17,46 +17,53 @@ from datetime import datetime
 # CONFIGURAÇÃO DA PÁGINA
 # ============================================================
 st.set_page_config(
-    page_title="Dashboard Bobinas BSW",
-    page_icon="🏭",
+    page_title="Grupo Delga | Dashboard Bobinas BSW",
+    page_icon="🔵",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ============================================================
-# ESTILO CSS CUSTOMIZADO (tema industrial escuro)
+# ESTILO CSS CUSTOMIZADO (identidade Grupo Delga)
 # ============================================================
 st.markdown("""
 <style>
-    .stApp { background-color: #0A1628; }
-    header[data-testid="stHeader"] { background-color: #0A1628; }
-    section[data-testid="stSidebar"] { background-color: #0F1B2D; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    .stApp { background-color: #080E1A; font-family: 'Inter', sans-serif; }
+    header[data-testid="stHeader"] { background-color: #080E1A; }
+    section[data-testid="stSidebar"] { background-color: #0C1425; border-right: 1px solid #1A2744; }
     div[data-testid="stMetric"] {
-        background-color: #162236;
-        border: 1px solid #1E3A5F;
-        border-radius: 8px;
-        padding: 16px;
+        background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
+        border: 1px solid #1A2744;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    div[data-testid="stMetric"] label { color: #B0BEC5 !important; }
+    div[data-testid="stMetric"] label { color: #8899B0 !important; font-weight: 500 !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.5px; }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        color: #00D4FF !important;
-        font-family: 'Consolas', monospace;
+        color: #FFFFFF !important;
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px; background-color: #0F1B2D; border-radius: 8px; padding: 4px;
+        gap: 4px; background-color: #0C1425; border-radius: 10px; padding: 4px; border: 1px solid #1A2744;
     }
-    .stTabs [data-baseweb="tab"] { color: #B0BEC5; border-radius: 6px; }
-    .stTabs [aria-selected="true"] { background-color: #1E3A5F !important; color: #00D4FF !important; }
-    h1, h2, h3 { color: #00D4FF !important; }
-    h4, h5, h6 { color: #B0BEC5 !important; }
-    p, span, li { color: #CFD8DC; }
-    .stDataFrame { border: 1px solid #1E3A5F; border-radius: 8px; }
-    hr { border-color: #1E3A5F; }
+    .stTabs [data-baseweb="tab"] { color: #8899B0; border-radius: 8px; font-weight: 500; }
+    .stTabs [aria-selected="true"] { background-color: #1400FF !important; color: #FFFFFF !important; }
+    h1, h2, h3 { color: #FFFFFF !important; font-family: 'Inter', sans-serif; font-weight: 700; }
+    h4, h5, h6 { color: #8899B0 !important; font-family: 'Inter', sans-serif; font-weight: 600; }
+    p, span, li { color: #B8C8DC; }
+    .stDataFrame { border: 1px solid #1A2744; border-radius: 10px; overflow: hidden; }
+    hr { border-color: #1A2744; }
     div[data-testid="stFileUploader"] {
-        background-color: #162236; border: 2px dashed #1E3A5F; border-radius: 12px; padding: 16px;
+        background-color: #0F1A2E; border: 2px dashed #1A2744; border-radius: 12px; padding: 16px;
     }
-    div[data-testid="stFileUploader"]:hover { border-color: #00D4FF; }
-    div[data-testid="stSidebar"] .stRadio label { color: #B0BEC5 !important; }
+    div[data-testid="stFileUploader"]:hover { border-color: #1400FF; }
+    div[data-testid="stSidebar"] .stRadio label { color: #8899B0 !important; }
+    .stSelectbox label { color: #8899B0 !important; }
+    .stButton > button[kind="primary"] { background-color: #1400FF !important; border: none; }
+    .stButton > button[kind="primary"]:hover { background-color: #2010FF !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,26 +78,27 @@ UNIDADE_COLORS = {
 }
 
 COLORS = {
-    "cyan": "#00D4FF", "amber": "#FFB800", "emerald": "#00E676",
+    "cyan": "#4DA3FF", "amber": "#FFB800", "emerald": "#00E676",
     "coral": "#FF6B6B", "purple": "#A78BFA", "teal": "#4DD0E1",
-    "bg_card": "#162236", "bg_dark": "#0F1B2D",
-    "border": "#1E3A5F", "text_light": "#B0BEC5", "text_white": "#ECEFF1",
+    "blue_delga": "#1400FF", "blue_light": "#4DA3FF",
+    "bg_card": "#0F1A2E", "bg_dark": "#0C1425",
+    "border": "#1A2744", "text_light": "#8899B0", "text_white": "#ECEFF1",
 }
 
 CHART_COLORS = [
-    "#00D4FF", "#FFB800", "#00E676", "#A78BFA", "#FF6B6B",
+    "#4DA3FF", "#FFB800", "#00E676", "#A78BFA", "#FF6B6B",
     "#4DD0E1", "#FFD54F", "#69F0AE", "#B39DDB", "#FF8A80",
     "#80DEEA", "#FFF176", "#A5D6A7", "#CE93D8", "#EF9A9A",
 ]
 
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor="#162236",
-    plot_bgcolor="#162236",
-    font=dict(color="#B0BEC5", family="Arial"),
+    paper_bgcolor="#0F1A2E",
+    plot_bgcolor="#0F1A2E",
+    font=dict(color="#8899B0", family="Inter, Arial"),
     margin=dict(l=40, r=40, t=50, b=40),
     legend=dict(
-        bgcolor="rgba(22,34,54,0.8)", bordercolor="#1E3A5F",
-        borderwidth=1, font=dict(color="#B0BEC5"),
+        bgcolor="rgba(15,26,46,0.9)", bordercolor="#1A2744",
+        borderwidth=1, font=dict(color="#8899B0"),
     ),
 )
 
@@ -391,7 +399,7 @@ def create_area_chart(df, col_names):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=meses, y=valores,
-        fill='tozeroy', fillcolor='rgba(0,212,255,0.15)',
+        fill='tozeroy', fillcolor='rgba(20,0,255,0.12)',
         line=dict(color=COLORS["cyan"], width=3),
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
@@ -693,13 +701,12 @@ def render_chart(fig):
 def main():
     # SIDEBAR
     with st.sidebar:
+        st.image("logo_delga.png", use_container_width=True)
         st.markdown("""
-        <div style="text-align:center; padding:16px 0;">
-            <span style="font-size:40px;">🏭</span>
-            <h2 style="margin:8px 0 4px 0; font-size:18px; color:#00D4FF !important;">Dashboard BSW</h2>
-            <p style="color:#546E7A; font-size:12px; margin:0;">Controle de Matéria-Prima</p>
+        <div style="text-align:center; padding:8px 0 16px 0;">
+            <p style="color:#8899B0; font-size:11px; margin:0; text-transform:uppercase; letter-spacing:1.5px; font-weight:600;">Controle de Matéria-Prima</p>
         </div>
-        <hr style="border-color:#1E3A5F; margin:8px 0 16px 0;">
+        <hr style="border-color:#1A2744; margin:0 0 16px 0;">
         """, unsafe_allow_html=True)
 
         # ── ÁREA ADMIN (protegida por senha) ──
@@ -742,23 +749,23 @@ def main():
 
         st.markdown("---")
         st.markdown("""
-        <div style="padding:8px; background:#162236; border-radius:8px; border:1px solid #1E3A5F; margin-top:8px;">
-            <p style="color:#546E7A; font-size:11px; margin:0;">
-                <b style="color:#B0BEC5;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
-                <b style="color:#B0BEC5;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
+        <div style="padding:10px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border-radius:10px; border:1px solid #1A2744; margin-top:8px;">
+            <p style="color:#5A7090; font-size:11px; margin:0; line-height:1.6;">
+                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
+                <b style="color:#8899B0;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
     # HEADER
     st.markdown("""
-    <div style="display:flex; align-items:center; gap:16px; margin-bottom:8px;">
-        <div style="background:#162236; border:1px solid #1E3A5F; border-radius:12px; padding:12px; display:flex; align-items:center; justify-content:center;">
-            <span style="font-size:28px;">🏭</span>
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #1A2744;">
+        <div style="background:linear-gradient(135deg, #1400FF 0%, #0A00AA 100%); border-radius:12px; padding:14px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(20,0,255,0.3);">
+            <span style="font-size:24px; color:white; font-weight:800; font-family:'Inter',sans-serif;">BSW</span>
         </div>
         <div>
-            <h1 style="margin:0; font-size:28px; color:#00D4FF !important;">Controle de Matéria-Prima</h1>
-            <p style="margin:0; color:#546E7A; font-family:Consolas,monospace; font-size:13px;">BOBINAS BSW — JAN A MAI / 2026</p>
+            <h1 style="margin:0; font-size:26px; color:#FFFFFF !important; font-weight:800; letter-spacing:-0.5px;">Controle de Matéria-Prima</h1>
+            <p style="margin:4px 0 0 0; color:#5A7090; font-size:12px; font-weight:500; letter-spacing:0.5px;">BOBINAS BSW — JAN A MAI / 2026 | GRUPO DELGA</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -785,12 +792,12 @@ def main():
     # Se não tem dados de nenhuma fonte
     if df_raw is None:
         st.markdown("""
-        <div style="text-align:center; padding:80px 20px; background:#162236; border:2px dashed #1E3A5F; border-radius:16px; margin:40px auto; max-width:600px;">
+        <div style="text-align:center; padding:80px 20px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border:2px dashed #1A2744; border-radius:16px; margin:40px auto; max-width:600px;">
             <span style="font-size:64px;">📊</span>
-            <h2 style="color:#00D4FF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
-            <p style="color:#546E7A; font-size:14px;">
+            <h2 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
+            <p style="color:#5A7090; font-size:14px;">
                 Nenhum dado disponível ainda.<br><br>
-                <b style="color:#B0BEC5;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral<br>
+                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral<br>
                 para enviar o arquivo Excel pela primeira vez.
             </p>
         </div>
