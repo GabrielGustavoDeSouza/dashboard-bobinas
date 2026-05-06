@@ -821,14 +821,12 @@ def main():
     total_peso_analisado = float(df_unidades['peso_analisado'].sum()) if len(df_unidades) > 0 else 0
     total_ganho = float(df_unidades['ganho'].sum()) if len(df_unidades) > 0 else 0
 
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3 = st.columns(3)
     with k1:
-        st.metric("Total de Bobinas", f"{total_bobinas:,}".replace(",", "."))
+        st.metric("Peso Total (MP)", f"{total_peso:,.0f} ton".replace(",", "."))
     with k2:
-        st.metric("Peso Total", f"{total_peso:,.0f} ton".replace(",", "."))
+        st.metric("Peso Analisado (MP)", f"{total_peso_analisado:,.0f} ton".replace(",", "."))
     with k3:
-        st.metric("Peso Analisado", f"{total_peso_analisado:,.0f} ton".replace(",", "."))
-    with k4:
         st.metric("Ganho Potencial", f"R$ {total_ganho:,.0f}".replace(",", "."))
 
     # ============================================================
@@ -857,16 +855,14 @@ def main():
             u_ganho = float(row_u['ganho'])
             u_pct = float(row_u['pct'])
 
-        uk1, uk2, uk3, uk4, uk5 = st.columns(5)
+        uk1, uk2, uk3, uk4 = st.columns(4)
         with uk1:
-            st.metric("Bobinas", f"{u_bobinas:,}".replace(",", "."))
+            st.metric("Peso Total (MP)", f"{u_peso:,.1f} ton".replace(",", "."))
         with uk2:
-            st.metric("Peso Total", f"{u_peso:,.1f} ton".replace(",", "."))
+            st.metric("Peso Analisado (MP)", f"{u_analisado:,.1f} ton".replace(",", "."))
         with uk3:
-            st.metric("Peso Analisado", f"{u_analisado:,.1f} ton".replace(",", "."))
-        with uk4:
             st.metric("% Concluído", f"{u_pct:.1f}%")
-        with uk5:
+        with uk4:
             st.metric("Ganho (R$)", f"R$ {u_ganho:,.0f}".replace(",", "."))
 
     st.markdown("<br>", unsafe_allow_html=True)
