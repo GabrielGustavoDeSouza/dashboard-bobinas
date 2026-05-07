@@ -864,9 +864,9 @@ def main():
 
         uk1, uk2, uk3, uk4 = st.columns(4)
         with uk1:
-            st.metric("Peso Total (MP)", f"{u_peso:,.1f} ton".replace(",", "."))
+            st.metric("Peso Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
         with uk2:
-            st.metric("Peso Analisado (MP)", f"{u_analisado:,.1f} ton".replace(",", "."))
+            st.metric("Peso Analisado (MP)", f"{u_analisado:,.0f} ton".replace(",", "."))
         with uk3:
             st.metric("% Concluído", f"{u_pct:.1f}%")
         with uk4:
