@@ -830,9 +830,9 @@ def main():
 
     k1, k2, k3 = st.columns(3)
     with k1:
-        st.metric("Peso Total (MP)", f"{total_peso:,.0f} ton".replace(",", "."))
+        st.metric("Peso Médio Total (MP)", f"{total_peso:,.0f} ton".replace(",", "."))
     with k2:
-        st.metric("Peso Analisado (MP)", f"{total_peso_analisado:,.0f} ton".replace(",", "."))
+        st.metric("Peso Médio Analisado (MP)", f"{total_peso_analisado:,.0f} ton".replace(",", "."))
     with k3:
         st.metric("Ganho Potencial", f"R$ {total_ganho:,.0f}".replace(",", "."))
 
@@ -864,9 +864,9 @@ def main():
 
         uk1, uk2, uk3, uk4 = st.columns(4)
         with uk1:
-            st.metric("Peso Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
+            st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
         with uk2:
-            st.metric("Peso Analisado (MP)", f"{u_analisado:,.0f} ton".replace(",", "."))
+            st.metric("Peso Médio Analisado (MP)", f"{u_analisado:,.0f} ton".replace(",", "."))
         with uk3:
             st.metric("% Concluído", f"{u_pct:.1f}%")
         with uk4:
