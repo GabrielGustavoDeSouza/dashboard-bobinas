@@ -862,7 +862,7 @@ def main():
             u_ganho = float(row_u['ganho'])
             u_pct = float(row_u['pct'])
 
-        uk1, uk2, uk3, uk4 = st.columns(4)
+        uk1, uk2, uk3, uk4, uk5 = st.columns(5)
         with uk1:
             st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
         with uk2:
@@ -870,7 +870,10 @@ def main():
         with uk3:
             st.metric("% Concluído", f"{u_pct:.1f}%")
         with uk4:
-            st.metric("Ganho (R$)", f"R$ {u_ganho:,.0f}".replace(",", "."))
+            st.metric("Ganho Mensal", f"R$ {u_ganho:,.0f}".replace(",", "."))
+        with uk5:
+            u_ganho_anual = u_ganho * 12
+            st.metric("Possível Ganho Anual", f"R$ {u_ganho_anual:,.0f}".replace(",", "."))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
