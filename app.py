@@ -882,7 +882,7 @@ def main():
     # ============================================================
     # ABAS
     # ============================================================
-    tab1, tab2, tab3 = st.tabs(["📊 Visão Geral", "🔍 Análises", "💰 Financeiro"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Visão Geral", "🔍 Análises", "💰 Financeiro", "📈 Timeline Financeiro"])
 
     # ── ABA 1: VISÃO GERAL ──
     with tab1:
@@ -1008,6 +1008,167 @@ def main():
             st.dataframe(df_fin, use_container_width=True, hide_index=True)
         else:
             st.info("Dados financeiros não encontrados na aba Formulas.")
+
+    # ── ABA 4: TIMELINE FINANCEIRO ──
+    with tab4:
+        st.markdown("### Timeline de Retorno Financeiro")
+        st.markdown("<p style='color:#5A7090; font-size:13px;'>Projeção do ganho mensal ao longo do tempo. Cada material contribui por 12 meses a partir do \"Primeiro Ganho Previsto\".</p>", unsafe_allow_html=True)
+
+        # Detectar coluna "Primeiro Ganho Previsto" (ou similar)
+        ganho_prev_col = [c for c in df.columns if 'Primeiro' in c and 'Ganho' in c]
+        ganho_mensal_col = [c for c in df.columns if 'Ganho' in c and 'mensal' in c.lower()]
+        unidade_col_tl = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
+
+        if not ganho_prev_col:
+            st.info(
+                "⏳ Coluna 'Primeiro Ganho Previsto' não encontrada no arquivo atual.\n\n"
+                "Quando você adicionar essa coluna na planilha (com valores como jan/26, fev/26, etc.) "
+                "e fizer upload, o gráfico de timeline aparecerá automaticamente."
+            )
+        elif not ganho_mensal_col:
+            st.info("Coluna 'Ganho mensal' não encontrada.")
+        elif not unidade_col_tl:
+            st.info("Coluna 'Unidade Delga' não encontrada.")
+        else:
+            # Processar timeline
+            col_prev = ganho_prev_col[0]
+            col_ganho_m = ganho_mensal_col[0]
+            col_unid = unidade_col_tl[0]
+
+            df_tl = df[[col_unid, col_ganho_m, col_prev]].copy()
+            df_tl['ganho_num'] = pd.to_numeric(df_tl[col_ganho_m], errors='coerce').fillna(0)
+            df_tl = df_tl[df_tl['ganho_num'] > 0].copy()
+            df_tl['primeiro_ganho_str'] = df_tl[col_prev].astype(str).str.strip()
+
+            # Filtrar apenas linhas com data válida
+            df_tl = df_tl[df_tl['primeiro_ganho_str'].notna() & (df_tl['primeiro_ganho_str'] != '') & (df_tl['primeiro_ganho_str'] != 'nan') & (df_tl['primeiro_ganho_str'] != '0')]
+
+            if len(df_tl) == 0:
+                st.info(
+                    "⏳ Nenhum material com 'Primeiro Ganho Previsto' preenchido ainda.\n\n"
+                    "Preencha a coluna na planilha com o mês/ano (ex: jan/26, out/26) "
+                    "para ver a projeção de retorno financeiro."
+                )
+            else:
+                # Converter mes/ano para datetime
+                meses_map = {
+                    'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+                    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+                }
+
+                def parse_mes_ano(val):
+                    """Converte 'jan/26' ou 'out/27' para datetime."""
+                    try:
+                        val = str(val).strip().lower()
+                        parts = val.replace('-', '/').split('/')
+                        if len(parts) == 2:
+                            mes_str = parts[0][:3]
+                            ano_str = parts[1]
+                            mes = meses_map.get(mes_str)
+                            if mes:
+                                ano = int(ano_str)
+                                if ano < 100:
+                                    ano += 2000
+                                return pd.Timestamp(year=ano, month=mes, day=1)
+                    except:
+                        pass
+                    return None
+
+                df_tl['data_inicio'] = df_tl['primeiro_ganho_str'].apply(parse_mes_ano)
+                df_tl = df_tl[df_tl['data_inicio'].notna()]
+
+                if len(df_tl) == 0:
+                    st.info("Não foi possível interpretar as datas na coluna 'Primeiro Ganho Previsto'. Use o formato mes/ano (ex: jan/26, out/26).")
+                else:
+                    # Gerar range de meses (do primeiro ao último + 12)
+                    data_min = df_tl['data_inicio'].min()
+                    data_max = df_tl['data_inicio'].max() + pd.DateOffset(months=11)
+                    meses_range = pd.date_range(start=data_min, end=data_max, freq='MS')
+
+                    # Calcular ganho por mês por unidade
+                    unidades_presentes = df_tl[col_unid].unique().tolist()
+                    timeline_data = {}
+
+                    for unidade in unidades_presentes:
+                        timeline_data[unidade] = pd.Series(0.0, index=meses_range)
+
+                    timeline_data['Total Geral'] = pd.Series(0.0, index=meses_range)
+
+                    for _, row in df_tl.iterrows():
+                        inicio = row['data_inicio']
+                        ganho = row['ganho_num']
+                        unidade = row[col_unid]
+                        # Distribuir ganho por 12 meses
+                        for m in range(12):
+                            mes_atual = inicio + pd.DateOffset(months=m)
+                            if mes_atual in meses_range:
+                                if unidade in timeline_data:
+                                    timeline_data[unidade][mes_atual] += ganho
+                                timeline_data['Total Geral'][mes_atual] += ganho
+
+                    # Criar gráfico
+                    fig_tl = go.Figure()
+
+                    # Adicionar linha de cada unidade
+                    for unidade in unidades_presentes:
+                        color = get_unidade_color(unidade)
+                        fig_tl.add_trace(go.Scatter(
+                            x=meses_range,
+                            y=timeline_data[unidade].values,
+                            mode='lines+markers',
+                            name=unidade,
+                            line=dict(color=color, width=2),
+                            marker=dict(size=5),
+                            hovertemplate='%{x|%b/%Y}<br>R$ %{y:,.0f}<extra>' + unidade + '</extra>'
+                        ))
+
+                    # Linha Total Geral (azul mais forte, mais grossa)
+                    fig_tl.add_trace(go.Scatter(
+                        x=meses_range,
+                        y=timeline_data['Total Geral'].values,
+                        mode='lines+markers',
+                        name='Total Geral',
+                        line=dict(color='#1400FF', width=3.5),
+                        marker=dict(size=7),
+                        hovertemplate='%{x|%b/%Y}<br>R$ %{y:,.0f}<extra>Total Geral</extra>'
+                    ))
+
+                    fig_tl.update_layout(
+                        title=dict(text="Projeção de Ganho Mensal por Período", font=dict(size=16, color=COLORS["cyan"])),
+                        xaxis=dict(
+                            title="Mês",
+                            tickformat='%b/%Y',
+                            dtick='M1',
+                            gridcolor='#1A2744',
+                            color='#8899B0',
+                        ),
+                        yaxis=dict(
+                            title="Ganho Mensal (R$)",
+                            gridcolor='#1A2744',
+                            color='#8899B0',
+                            tickformat=',.0f',
+                        ),
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#8899B0'),
+                        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                        hovermode='x unified',
+                        height=500,
+                        margin=dict(l=60, r=20, t=60, b=60),
+                    )
+
+                    st.plotly_chart(fig_tl, use_container_width=True, theme=None)
+
+                    # Tabela resumo
+                    st.markdown("### Resumo por Mês")
+                    df_resumo = pd.DataFrame(timeline_data)
+                    df_resumo.index = df_resumo.index.strftime('%b/%Y')
+                    df_resumo = df_resumo.round(0).astype(int)
+                    # Formatar como moeda
+                    df_display_tl = df_resumo.copy()
+                    for col in df_display_tl.columns:
+                        df_display_tl[col] = df_display_tl[col].apply(lambda x: f"R$ {x:,.0f}".replace(",", ".") if x > 0 else "-")
+                    st.dataframe(df_display_tl, use_container_width=True)
 
 
 if __name__ == "__main__":
