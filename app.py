@@ -828,13 +828,15 @@ def main():
     total_peso_analisado = float(df_unidades['peso_analisado'].sum()) if len(df_unidades) > 0 else 0
     total_ganho = float(df_unidades['ganho'].sum()) if len(df_unidades) > 0 else 0
 
+    total_pct_geral = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
+
     k1, k2, k3 = st.columns(3)
     with k1:
         st.metric("Peso Médio Total (MP)", f"{total_peso:,.0f} ton".replace(",", "."))
     with k2:
         st.metric("Peso Médio Analisado (MP)", f"{total_peso_analisado:,.0f} ton".replace(",", "."))
     with k3:
-        st.metric("Ganho Potencial", f"R$ {total_ganho:,.0f}".replace(",", "."))
+        st.metric("% Concluído Geral", f"{total_pct_geral:.1f}%")
 
     # ============================================================
     # SELETOR DE UNIDADE
