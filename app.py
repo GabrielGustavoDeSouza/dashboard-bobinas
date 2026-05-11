@@ -838,17 +838,27 @@ def main():
     with k3:
         st.metric("% Concluído Geral", f"{total_pct_geral:.1f}%")
 
-    # ============================================================
-    # SELETOR DE UNIDADE
+        # ============================================================
+    # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
     if len(df_unidades) > 0:
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("  
+", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
-        unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
-        selected_unidade = st.selectbox(
-            "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
-        )
+        col_sel1, col_sel2 = st.columns([2, 1])
+        with col_sel1:
+            unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
+            selected_unidade = st.selectbox(
+                "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
+            )
+        with col_sel2:
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
+            ano_selecionado = st.radio(
+                "Filtrar Ganho Acumulado no Ano:", 
+                ["2026", "2027", "2028"], 
+                horizontal=True
+            )
 
         if selected_unidade == "Todas":
             u_bobinas = total_bobinas
@@ -864,6 +874,72 @@ def main():
             u_ganho = float(row_u['ganho'])
             u_pct = float(row_u['pct'])
 
+        # --- Lógica para calcular o ganho real no ano selecionado ---
+        ganho_acumulado_ano = 0
+        ganho_prev_col = [c for c in df.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
+        ganho_mensal_col = [c for c in df.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
+        unidade_col_tl = [c for c in df.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
+
+        if ganho_prev_col and ganho_mensal_col and unidade_col_tl:
+            df_calc = df.copy()
+            if selected_unidade != "Todas":
+                df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
+            
+            col_prev = ganho_prev_col[0]
+            col_ganho_m = ganho_mensal_col[0]
+            
+            df_calc['ganho_num'] = pd.to_numeric(df_calc[col_ganho_m], errors='coerce').fillna(0)
+            df_calc = df_calc[df_calc['ganho_num'] > 0]
+            
+            meses_map = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6, 'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12, 'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4, 'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9, 'outubro':10, 'novembro':11, 'dezembro':12}
+            
+            def parse_mes_ano_simples(val):
+                try:
+                    if isinstance(val, (pd.Timestamp,)): return val.replace(day=1)
+                    import datetime
+                    if isinstance(val, datetime.datetime): return pd.Timestamp(val).replace(day=1)
+                    val_str = str(val).strip().lower()
+                    try:
+                        parsed = pd.to_datetime(val_str)
+                        if pd.notna(parsed): return parsed.replace(day=1)
+                    except: pass
+                    for sep in [',', ' ']:
+                        if sep in val_str:
+                            parts = [p.strip() for p in val_str.split(sep) if p.strip()]
+                            if len(parts) == 2:
+                                mes = meses_map.get(parts[0].lower())
+                                if mes:
+                                    ano = int(parts[1])
+                                    if ano < 100: ano += 2000
+                                    return pd.Timestamp(year=ano, month=mes, day=1)
+                    for sep in ['/', '-']:
+                        if sep in val_str:
+                            parts = val_str.split(sep)
+                            if len(parts) == 2:
+                                mes = meses_map.get(parts[0].strip()[:3])
+                                if mes:
+                                    ano = int(parts[1].strip())
+                                    if ano < 100: ano += 2000
+                                    return pd.Timestamp(year=ano, month=mes, day=1)
+                except: pass
+                return None
+
+            df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_simples)
+            df_calc = df_calc[df_calc['data_inicio'].notna()]
+            
+            ano_alvo = int(ano_selecionado)
+            
+            for _, row in df_calc.iterrows():
+                inicio = row['data_inicio']
+                ganho = row['ganho_num']
+                # Contar quantos meses dos 12 caem no ano selecionado
+                meses_no_ano = 0
+                for m in range(12):
+                    mes_atual = inicio + pd.DateOffset(months=m)
+                    if mes_atual.year == ano_alvo:
+                        meses_no_ano += 1
+                ganho_acumulado_ano += (ganho * meses_no_ano)
+
         uk1, uk2, uk3, uk4, uk5 = st.columns(5)
         with uk1:
             st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
@@ -874,10 +950,10 @@ def main():
         with uk4:
             st.metric("Ganho Mensal", f"R$ {u_ganho:,.0f}".replace(",", "."))
         with uk5:
-            u_ganho_anual = u_ganho * 12
-            st.metric("Possível Ganho Anual", f"R$ {u_ganho_anual:,.0f}".replace(",", "."))
+            st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("  
+", unsafe_allow_html=True)
 
     # ============================================================
     # ABAS
