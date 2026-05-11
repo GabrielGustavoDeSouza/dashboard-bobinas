@@ -594,10 +594,7 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>%{value:,.1f} ton</b>  
-%{percent}<extra></extra>',
-    )])
+        hovertemplate='%{label} <b>%{value:,.1f} ton</b>  %{percent}<extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Tipo de Bobina", font=dict(size=16, color=COLORS["cyan"])),
