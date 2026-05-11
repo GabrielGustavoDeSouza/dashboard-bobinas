@@ -558,49 +558,28 @@ def create_usinas_chart(df_usinas, top_n=15):
     return fig
 
 
-def create_tipo_pie_chart(df, col_media):
-    """Gráfico de pizza por Tipo de bobina (Agrupado por terminação)."""
-    tipo_col = [c for c in df.columns if c.strip() == 'Tipo']
-    if not tipo_col:
-        return None
-    df_valid = df[df[tipo_col[0]].notna() & (df[tipo_col[0]].astype(str).str.strip() != '')].copy()
+def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
+    """Gráfico de barras horizontal genérico."""
+    df_valid = df[df[group_col].notna() & (df[group_col].astype(str).str.strip() != '')].copy()
     if len(df_valid) == 0:
         return None
-        
-    # --- NOVA LÓGICA DE AGRUPAMENTO ---
-    def agrupar_tipo(tipo):
-        t = str(tipo).strip().upper()
-        if t.endswith('Z'): return 'BZ'
-        if t.endswith('Q'): return 'BQ'
-        if t.endswith('F'): return 'BF'
-        return 'Outros'
-        
-    # Aplica a regra e cria uma nova coluna temporária
-    df_valid['Tipo_Agrupado'] = df_valid[tipo_col[0]].apply(agrupar_tipo)
-    
-    # Remove qualquer coisa que não seja Z, Q ou F (para garantir apenas as 3 fatias)
-    df_valid = df_valid[df_valid['Tipo_Agrupado'] != 'Outros']
-    
-    # Agrupa os valores somando a necessidade média
-    dist = df_valid.groupby('Tipo_Agrupado')[col_media].sum().sort_values(ascending=False)
-    
-    # Define cores fixas para manter o padrão visual (Azul, Amarelo, Verde)
-    cores_fatias = ["#4DA3FF", "#FFB800", "#00E676"]
-    
-    fig = go.Figure(data=[go.Pie(
-        labels=[str(x) for x in dist.index],
-        values=dist.values.tolist(),
-        hole=0.45,
-        marker=dict(colors=cores_fatias),
-        textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label} <b>%{value:,.1f} ton</b>  %{percent}<extra></extra>',    )])
+    dist = df_valid.groupby(group_col)[col_media].sum().sort_values(ascending=True).tail(top_n)
+    fig = go.Figure(data=[go.Bar(
+        x=dist.values.tolist(),
+        y=[str(x) for x in dist.index],
+        orientation='h',
+        marker=dict(color=color or COLORS["cyan"]),
+        hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>',
+    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
-        title=dict(text="Distribuição por Tipo de Bobina", font=dict(size=16, color=COLORS["cyan"])),
-        height=400,
+        title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
+        height=max(400, min(top_n, len(dist)) * 32),
+        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
+
 
 def create_unidade_bar_chart(df, col_media):
     """Gráfico de barras por unidade Delga com cores padronizadas."""
@@ -859,11 +838,12 @@ def main():
     with k3:
         st.metric("% Concluído Geral", f"{total_pct_geral:.1f}%")
 
-       # ============================================================
+        # ============================================================
     # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
     if len(df_unidades) > 0:
-        st.markdown(" ", unsafe_allow_html=True)
+        st.markdown("  
+", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
         col_sel1, col_sel2 = st.columns([2, 1])
@@ -952,6 +932,7 @@ def main():
             for _, row in df_calc.iterrows():
                 inicio = row['data_inicio']
                 ganho = row['ganho_num']
+                # Contar quantos meses dos 12 caem no ano selecionado
                 meses_no_ano = 0
                 for m in range(12):
                     mes_atual = inicio + pd.DateOffset(months=m)
@@ -971,7 +952,8 @@ def main():
         with uk5:
             st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown(" ", unsafe_allow_html=True)
+    st.markdown("  
+", unsafe_allow_html=True)
 
     # ============================================================
     # ABAS
