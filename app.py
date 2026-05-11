@@ -28,7 +28,7 @@ st.set_page_config(
 # ============================================================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' );
     
     .stApp { background-color: #080E1A; font-family: 'Inter', sans-serif; }
     header[data-testid="stHeader"] { background-color: #080E1A; }
@@ -150,7 +150,7 @@ def load_data_from_github():
     }
     params = {"ref": GITHUB_BRANCH}
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params )
     if response.status_code == 200:
         content = response.json()
         file_content = base64.b64decode(content["content"])
@@ -174,7 +174,7 @@ def save_data_to_github(file_bytes, filename):
         "Accept": "application/vnd.github.v3+json",
     }
 
-    # Verificar se o arquivo já existe (para obter o SHA)
+    # Verificar se o arquivo já existe (para obter o SHA )
     response = requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH})
     sha = None
     if response.status_code == 200:
@@ -218,7 +218,7 @@ def get_access_token():
         "client_secret": client_secret,
         "scope": "https://graph.microsoft.com/.default",
     }
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data )
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -231,11 +231,11 @@ def load_data_from_sharepoint():
     site_path = st.secrets["SHAREPOINT_SITE_PATH"]
     file_path = st.secrets["SHAREPOINT_FILE_PATH"]
     site_url = f"https://graph.microsoft.com/v1.0/sites/{site_domain}:/sites/{site_path}"
-    site_resp = requests.get(site_url, headers=headers)
+    site_resp = requests.get(site_url, headers=headers )
     site_resp.raise_for_status()
     site_id = site_resp.json()["id"]
     file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_path}:/content"
-    file_resp = requests.get(file_url, headers=headers)
+    file_resp = requests.get(file_url, headers=headers )
     file_resp.raise_for_status()
     excel_bytes = io.BytesIO(file_resp.content)
     df_controle = smart_read_excel(excel_bytes, "Controle")
@@ -295,8 +295,6 @@ def process_data(df_raw):
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
     return df, col_names
-
-
 def parse_formulas(df_formulas):
     """Extrai dados estruturados da aba Formulas."""
     unidades = []
@@ -404,7 +402,8 @@ def create_area_chart(df, col_names):
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
         name='Necessidade (ton)',
-        hovertemplate='%{x}/2026<br><b>%{y:,.0f} ton</b><extra></extra>',
+        hovertemplate='%{x}/2026  
+<b>%{y:,.0f} ton</b><extra></extra>',
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -433,7 +432,9 @@ def create_unidade_pie_chart(df, col_media):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}<br><b>%{value:,.1f} ton</b><br>%{percent}<extra></extra>',
+        hovertemplate='%{label}  
+<b>%{value:,.1f} ton</b>  
+%{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -444,22 +445,44 @@ def create_unidade_pie_chart(df, col_media):
 
 
 def create_tipo_pie_chart(df, col_media):
-    """Gráfico de pizza por Tipo de bobina."""
+    """Gráfico de pizza por Tipo de bobina (Agrupado por terminação)."""
     tipo_col = [c for c in df.columns if c.strip() == 'Tipo']
     if not tipo_col:
         return None
     df_valid = df[df[tipo_col[0]].notna() & (df[tipo_col[0]].astype(str).str.strip() != '')].copy()
     if len(df_valid) == 0:
         return None
-    dist = df_valid.groupby(tipo_col[0])[col_media].sum().sort_values(ascending=False).head(10)
+        
+    # --- NOVA LÓGICA DE AGRUPAMENTO ---
+    def agrupar_tipo(tipo):
+        t = str(tipo).strip().upper()
+        if t.endswith('Z'): return 'BZ'
+        if t.endswith('Q'): return 'BQ'
+        if t.endswith('F'): return 'BF'
+        return 'Outros'
+        
+    # Aplica a regra e cria uma nova coluna temporária
+    df_valid['Tipo_Agrupado'] = df_valid[tipo_col[0]].apply(agrupar_tipo)
+    
+    # Remove qualquer coisa que não seja Z, Q ou F (para garantir apenas as 3 fatias)
+    df_valid = df_valid[df_valid['Tipo_Agrupado'] != 'Outros']
+    
+    # Agrupa os valores somando a necessidade média
+    dist = df_valid.groupby('Tipo_Agrupado')[col_media].sum().sort_values(ascending=False)
+    
+    # Define cores fixas para manter o padrão visual (Azul, Amarelo, Verde)
+    cores_fatias = ["#4DA3FF", "#FFB800", "#00E676"]
+    
     fig = go.Figure(data=[go.Pie(
         labels=[str(x) for x in dist.index],
         values=dist.values.tolist(),
         hole=0.45,
-        marker=dict(colors=CHART_COLORS[:len(dist)]),
+        marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}<br><b>%{value:,.1f} ton</b><br>%{percent}<extra></extra>',
+        hovertemplate='%{label}  
+<b>%{value:,.1f} ton</b>  
+%{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -490,7 +513,8 @@ def create_thickness_chart(df, col_media):
         x=[str(x) for x in dist.index],
         y=dist.values.tolist(),
         marker=dict(color=CHART_COLORS[:len(dist)]),
-        hovertemplate='%{x} mm<br><b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x} mm  
+<b>%{y:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -516,13 +540,15 @@ def create_progress_chart(df_unidades):
         name='Peso Total',
         x=unidades, y=peso_total,
         marker=dict(color=colors, opacity=0.4),
-        hovertemplate='%{x}<br>Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x}  
+Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
     ))
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
         marker=dict(color=colors, opacity=1.0),
-        hovertemplate='%{x}<br>Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x}  
+Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -546,7 +572,8 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{y}  
+<b>%{x:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -569,7 +596,8 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{y}  
+<b>%{x:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -579,8 +607,6 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
-
-
 def create_unidade_bar_chart(df, col_media):
     """Gráfico de barras por unidade Delga com cores padronizadas."""
     unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
@@ -596,7 +622,8 @@ def create_unidade_bar_chart(df, col_media):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}<br><b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{y}  
+<b>%{x:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -622,7 +649,8 @@ def create_ganho_unidade_chart(df_unidades):
         y=df_g['unidade'].tolist(),
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}<br><b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate='%{y}  
+<b>R$ %{x:,.0f}</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -649,7 +677,9 @@ def create_ganho_pie_chart(df_unidades):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}<br><b>R$ %{value:,.0f}</b><br>%{percent}<extra></extra>',
+        hovertemplate='%{label}  
+<b>R$ %{value:,.0f}</b>  
+%{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -672,7 +702,8 @@ def create_ganho_usinas_chart(df_usinas):
         y=df_g['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["emerald"]),
-        hovertemplate='%{y}<br><b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate='%{y}  
+<b>R$ %{x:,.0f}</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -751,7 +782,8 @@ def main():
         st.markdown("""
         <div style="padding:10px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border-radius:10px; border:1px solid #1A2744; margin-top:8px;">
             <p style="color:#5A7090; font-size:11px; margin:0; line-height:1.6;">
-                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
+                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.  
+
                 <b style="color:#8899B0;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
             </p>
         </div>
@@ -796,8 +828,11 @@ def main():
             <span style="font-size:64px;">📊</span>
             <h2 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
             <p style="color:#5A7090; font-size:14px;">
-                Nenhum dado disponível ainda.<br><br>
-                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral<br>
+                Nenhum dado disponível ainda.  
+  
+
+                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral  
+
                 para enviar o arquivo Excel pela primeira vez.
             </p>
         </div>
@@ -839,16 +874,26 @@ def main():
         st.metric("% Concluído Geral", f"{total_pct_geral:.1f}%")
 
     # ============================================================
-    # SELETOR DE UNIDADE
+    # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
     if len(df_unidades) > 0:
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("  
+", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
-        unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
-        selected_unidade = st.selectbox(
-            "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
-        )
+        col_sel1, col_sel2 = st.columns([2, 1])
+        with col_sel1:
+            unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
+            selected_unidade = st.selectbox(
+                "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
+            )
+        with col_sel2:
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
+            ano_selecionado = st.radio(
+                "Filtrar Ganho Acumulado no Ano:", 
+                ["2026", "2027", "2028"], 
+                horizontal=True
+            )
 
         if selected_unidade == "Todas":
             u_bobinas = total_bobinas
@@ -864,6 +909,71 @@ def main():
             u_ganho = float(row_u['ganho'])
             u_pct = float(row_u['pct'])
 
+        # --- Lógica para calcular o ganho real no ano selecionado ---
+        ganho_acumulado_ano = 0
+        ganho_prev_col = [c for c in df.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
+        ganho_mensal_col = [c for c in df.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
+        unidade_col_tl = [c for c in df.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
+
+        if ganho_prev_col and ganho_mensal_col and unidade_col_tl:
+            df_calc = df.copy()
+            if selected_unidade != "Todas":
+                df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
+            
+            col_prev = ganho_prev_col[0]
+            col_ganho_m = ganho_mensal_col[0]
+            
+            df_calc['ganho_num'] = pd.to_numeric(df_calc[col_ganho_m], errors='coerce').fillna(0)
+            df_calc = df_calc[df_calc['ganho_num'] > 0]
+            
+            meses_map = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6, 'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12, 'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4, 'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9, 'outubro':10, 'novembro':11, 'dezembro':12}
+            
+            def parse_mes_ano_simples(val):
+                try:
+                    if isinstance(val, (pd.Timestamp,)): return val.replace(day=1)
+                    import datetime
+                    if isinstance(val, datetime.datetime): return pd.Timestamp(val).replace(day=1)
+                    val_str = str(val).strip().lower()
+                    try:
+                        parsed = pd.to_datetime(val_str)
+                        if pd.notna(parsed): return parsed.replace(day=1)
+                    except: pass
+                    for sep in [',', ' ']:
+                        if sep in val_str:
+                            parts = [p.strip() for p in val_str.split(sep) if p.strip()]
+                            if len(parts) == 2:
+                                mes = meses_map.get(parts[0].lower())
+                                if mes:
+                                    ano = int(parts[1])
+                                    if ano < 100: ano += 2000
+                                    return pd.Timestamp(year=ano, month=mes, day=1)
+                    for sep in ['/', '-']:
+                        if sep in val_str:
+                            parts = val_str.split(sep)
+                            if len(parts) == 2:
+                                mes = meses_map.get(parts[0].strip()[:3])
+                                if mes:
+                                    ano = int(parts[1].strip())
+                                    if ano < 100: ano += 2000
+                                    return pd.Timestamp(year=ano, month=mes, day=1)
+                except: pass
+                return None
+
+            df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_simples)
+            df_calc = df_calc[df_calc['data_inicio'].notna()]
+            
+            ano_alvo = int(ano_selecionado)
+            
+            for _, row in df_calc.iterrows():
+                inicio = row['data_inicio']
+                ganho = row['ganho_num']
+                meses_no_ano = 0
+                for m in range(12):
+                    mes_atual = inicio + pd.DateOffset(months=m)
+                    if mes_atual.year == ano_alvo:
+                        meses_no_ano += 1
+                ganho_acumulado_ano += (ganho * meses_no_ano)
+
         uk1, uk2, uk3, uk4, uk5 = st.columns(5)
         with uk1:
             st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
@@ -874,11 +984,10 @@ def main():
         with uk4:
             st.metric("Ganho Mensal", f"R$ {u_ganho:,.0f}".replace(",", "."))
         with uk5:
-            u_ganho_anual = u_ganho * 12
-            st.metric("Possível Ganho Anual", f"R$ {u_ganho_anual:,.0f}".replace(",", "."))
+            st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
+    st.markdown("  
+", unsafe_allow_html=True)
     # ============================================================
     # ABAS
     # ============================================================
@@ -1170,7 +1279,9 @@ def main():
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
                             customdata=acum_values,
-                            hovertemplate='%{x|%b/%Y}<br>Ganho Mês: <b>R$ %{y:,.0f}</b><br>Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
+                            hovertemplate='%{x|%b/%Y}  
+Ganho Mês: <b>R$ %{y:,.0f}</b>  
+Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
                         ))
 
                     # Linha Total Geral (azul mais forte, mais grossa)
@@ -1183,7 +1294,9 @@ def main():
                         line=dict(color='#1400FF', width=3.5),
                         marker=dict(size=7),
                         customdata=acum_total,
-                        hovertemplate='%{x|%b/%Y}<br>Ganho Mês: <b>R$ %{y:,.0f}</b><br>Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
+                        hovertemplate='%{x|%b/%Y}  
+Ganho Mês: <b>R$ %{y:,.0f}</b>  
+Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
                     ))
 
                     fig_tl.update_layout(
