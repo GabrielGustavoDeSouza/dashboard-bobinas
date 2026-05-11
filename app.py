@@ -1150,12 +1150,18 @@ def main():
                                     timeline_data[unidade][mes_atual] += ganho
                                 timeline_data['Total Geral'][mes_atual] += ganho
 
+                    # Calcular acumulado por unidade
+                    acumulado_data = {}
+                    for key in timeline_data:
+                        acumulado_data[key] = timeline_data[key].cumsum()
+
                     # Criar gráfico
                     fig_tl = go.Figure()
 
                     # Adicionar linha de cada unidade
                     for unidade in unidades_presentes:
                         color = get_unidade_color(unidade)
+                        acum_values = acumulado_data[unidade].values
                         fig_tl.add_trace(go.Scatter(
                             x=meses_range,
                             y=timeline_data[unidade].values,
@@ -1163,10 +1169,12 @@ def main():
                             name=unidade,
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
-                            hovertemplate='%{x|%b/%Y}<br>R$ %{y:,.0f}<extra>' + unidade + '</extra>'
+                            customdata=acum_values,
+                            hovertemplate='%{x|%b/%Y}<br>Ganho Mês: <b>R$ %{y:,.0f}</b><br>Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
                         ))
 
                     # Linha Total Geral (azul mais forte, mais grossa)
+                    acum_total = acumulado_data['Total Geral'].values
                     fig_tl.add_trace(go.Scatter(
                         x=meses_range,
                         y=timeline_data['Total Geral'].values,
@@ -1174,7 +1182,8 @@ def main():
                         name='Total Geral',
                         line=dict(color='#1400FF', width=3.5),
                         marker=dict(size=7),
-                        hovertemplate='%{x|%b/%Y}<br>R$ %{y:,.0f}<extra>Total Geral</extra>'
+                        customdata=acum_total,
+                        hovertemplate='%{x|%b/%Y}<br>Ganho Mês: <b>R$ %{y:,.0f}</b><br>Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
                     ))
 
                     fig_tl.update_layout(
