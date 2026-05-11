@@ -402,9 +402,7 @@ def create_area_chart(df, col_names):
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
         name='Necessidade (ton)',
-        hovertemplate='%{x}/2026  
-<b>%{y:,.0f} ton</b><extra></extra>',
-    ))
+        hovertemplate='%{x}/2026  <b>%{y:,.0f} ton</b><extra></extra>',    ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Evolução da Necessidade Mensal (ton)", font=dict(size=16, color=COLORS["cyan"])),
