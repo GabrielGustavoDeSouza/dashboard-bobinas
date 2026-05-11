@@ -1014,10 +1014,10 @@ def main():
         st.markdown("### Timeline de Retorno Financeiro")
         st.markdown("<p style='color:#5A7090; font-size:13px;'>Projeção do ganho mensal ao longo do tempo. Cada material contribui por 12 meses a partir do \"Primeiro Ganho Previsto\".</p>", unsafe_allow_html=True)
 
-        # Detectar coluna "Primeiro Ganho Previsto" (ou similar)
-        ganho_prev_col = [c for c in df.columns if 'Primeiro' in c and 'Ganho' in c]
-        ganho_mensal_col = [c for c in df.columns if 'Ganho' in c and 'mensal' in c.lower()]
-        unidade_col_tl = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
+        # Detectar coluna "Primeiro Ganho Previsto" (ou similar) - busca case-insensitive
+        ganho_prev_col = [c for c in df.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
+        ganho_mensal_col = [c for c in df.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
+        unidade_col_tl = [c for c in df.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
 
         if not ganho_prev_col:
             st.info(
@@ -1050,31 +1050,75 @@ def main():
                     "para ver a projeção de retorno financeiro."
                 )
             else:
-                # Converter mes/ano para datetime
+                # Converter para datetime - suporta múltiplos formatos
                 meses_map = {
                     'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-                    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+                    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12,
+                    'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3,
+                    'abril': 4, 'maio': 5, 'junho': 6, 'julho': 7,
+                    'agosto': 8, 'setembro': 9, 'outubro': 10,
+                    'novembro': 11, 'dezembro': 12
                 }
 
                 def parse_mes_ano(val):
-                    """Converte 'jan/26' ou 'out/27' para datetime."""
+                    """Converte múltiplos formatos para datetime:
+                    - datetime/Timestamp direto do Excel (2026-03-01)
+                    - 'jan/26', 'out/27'
+                    - 'março, 2026', 'maio, 2026'
+                    - 'março 2026'
+                    """
                     try:
-                        val = str(val).strip().lower()
-                        parts = val.replace('-', '/').split('/')
-                        if len(parts) == 2:
-                            mes_str = parts[0][:3]
-                            ano_str = parts[1]
-                            mes = meses_map.get(mes_str)
-                            if mes:
-                                ano = int(ano_str)
-                                if ano < 100:
-                                    ano += 2000
-                                return pd.Timestamp(year=ano, month=mes, day=1)
+                        # Se já é datetime/Timestamp
+                        if isinstance(val, (pd.Timestamp,)):
+                            return val.replace(day=1)
+                        import datetime
+                        if isinstance(val, datetime.datetime):
+                            return pd.Timestamp(val).replace(day=1)
+
+                        val_str = str(val).strip().lower()
+
+                        # Tentar pd.to_datetime direto (pega '2026-03-01 00:00:00')
+                        try:
+                            parsed = pd.to_datetime(val_str)
+                            if pd.notna(parsed):
+                                return parsed.replace(day=1)
+                        except:
+                            pass
+
+                        # Formato 'março, 2026' ou 'maio, 2026'
+                        for sep in [',', ' ']:
+                            if sep in val_str:
+                                parts = [p.strip() for p in val_str.split(sep) if p.strip()]
+                                if len(parts) == 2:
+                                    mes_str = parts[0].lower()
+                                    ano_str = parts[1]
+                                    mes = meses_map.get(mes_str)
+                                    if mes:
+                                        ano = int(ano_str)
+                                        if ano < 100:
+                                            ano += 2000
+                                        return pd.Timestamp(year=ano, month=mes, day=1)
+
+                        # Formato 'jan/26' ou 'out/27'
+                        for sep in ['/', '-']:
+                            if sep in val_str:
+                                parts = val_str.split(sep)
+                                if len(parts) == 2:
+                                    mes_str = parts[0].strip()[:3]
+                                    ano_str = parts[1].strip()
+                                    mes = meses_map.get(mes_str)
+                                    if mes:
+                                        ano = int(ano_str)
+                                        if ano < 100:
+                                            ano += 2000
+                                        return pd.Timestamp(year=ano, month=mes, day=1)
                     except:
                         pass
                     return None
 
-                df_tl['data_inicio'] = df_tl['primeiro_ganho_str'].apply(parse_mes_ano)
+                # Primeiro tentar converter direto da coluna original (pode ser datetime)
+                col_prev_original = df_tl[col_prev]
+                df_tl['data_inicio'] = col_prev_original.apply(parse_mes_ano)
                 df_tl = df_tl[df_tl['data_inicio'].notna()]
 
                 if len(df_tl) == 0:
