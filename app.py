@@ -430,9 +430,7 @@ def create_unidade_pie_chart(df, col_media):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>%{value:,.1f} ton</b>  
-%{percent}<extra></extra>',
+        hovertemplate='%{label}  <b>%{value:,.1f} ton</b>  %{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
