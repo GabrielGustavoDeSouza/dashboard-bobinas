@@ -959,8 +959,7 @@ def main():
         with uk5:
             st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown("  
-", unsafe_allow_html=True)
+    st.markdown("  ", unsafe_allow_html=True)
     # ============================================================
     # ABAS
     # ============================================================
