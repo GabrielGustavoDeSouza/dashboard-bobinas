@@ -506,9 +506,7 @@ def create_thickness_chart(df, col_media):
         x=[str(x) for x in dist.index],
         y=dist.values.tolist(),
         marker=dict(color=CHART_COLORS[:len(dist)]),
-        hovertemplate='%{x} mm  
-<b>%{y:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{x} mm  <b>%{y:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Faixa de Espessura (mm)", font=dict(size=16, color=COLORS["cyan"])),
