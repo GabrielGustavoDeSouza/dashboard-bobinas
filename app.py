@@ -842,8 +842,7 @@ def main():
     # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
     if len(df_unidades) > 0:
-        st.markdown("  
-", unsafe_allow_html=True)
+        st.markdown(" ", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
         col_sel1, col_sel2 = st.columns([2, 1])
@@ -951,8 +950,7 @@ def main():
         with uk5:
             st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown("  
-", unsafe_allow_html=True)
+    st.markdown(" ", unsafe_allow_html=True)
 
     # ============================================================
     # ABAS
