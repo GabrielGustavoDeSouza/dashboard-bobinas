@@ -531,9 +531,7 @@ def create_progress_chart(df_unidades):
         name='Peso Total',
         x=unidades, y=peso_total,
         marker=dict(color=colors, opacity=0.4),
-        hovertemplate='%{x}  
-Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
-    ))
+        hovertemplate='%{x}  Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',    ))
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
@@ -563,9 +561,7 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Top Usinas por Peso (ton)", font=dict(size=16, color=COLORS["cyan"])),
@@ -587,9 +583,7 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
@@ -613,9 +607,7 @@ def create_unidade_bar_chart(df, col_media):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Necessidade por Unidade Delga (ton)", font=dict(size=16, color=COLORS["cyan"])),
@@ -640,9 +632,7 @@ def create_ganho_unidade_chart(df_unidades):
         y=df_g['unidade'].tolist(),
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  
-<b>R$ %{x:,.0f}</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Ganho Financeiro por Unidade (R$)", font=dict(size=16, color=COLORS["cyan"])),
