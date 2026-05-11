@@ -476,10 +476,7 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>%{value:,.1f} ton</b>  
-%{percent}<extra></extra>',
-    )])
+        hovertemplate='%{label} <b>%{value:,.1f} ton</b> %{percent}<extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Tipo de Bobina", font=dict(size=16, color=COLORS["cyan"])),
@@ -673,10 +670,7 @@ def create_ganho_pie_chart(df_unidades):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>R$ %{value:,.0f}</b>  
-%{percent}<extra></extra>',
-    )])
+        hovertemplate='%{label}  <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Ganho Financeiro por Unidade", font=dict(size=16, color=COLORS["cyan"])),
@@ -698,9 +692,7 @@ def create_ganho_usinas_chart(df_usinas):
         y=df_g['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["emerald"]),
-        hovertemplate='%{y}  
-<b>R$ %{x:,.0f}</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Ganho por Usina (R$)", font=dict(size=16, color=COLORS["cyan"])),
