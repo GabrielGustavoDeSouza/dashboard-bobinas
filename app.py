@@ -536,9 +536,7 @@ def create_progress_chart(df_unidades):
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
         marker=dict(color=colors, opacity=1.0),
-        hovertemplate='%{x}  
-Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
-    ))
+        hovertemplate='%{x}  Analisado: <b>%{y:,.1f} ton</b><extra></extra>',    ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Peso Total vs Analisado por Unidade", font=dict(size=16, color=COLORS["cyan"])),
