@@ -533,15 +533,13 @@ def create_progress_chart(df_unidades):
         name='Peso Total',
         x=unidades, y=peso_total,
         marker=dict(color=colors, opacity=0.4),
-        hovertemplate='%{x}  
-Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x}  Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
     ))
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
         marker=dict(color=colors, opacity=1.0),
-        hovertemplate='%{x}  
-Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x}  Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
