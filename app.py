@@ -40,21 +40,14 @@ st.markdown("""
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    div[data-testid="stMetric"] label { 
-        color: #8899B0 !important; 
-        font-weight: 500 !important; 
-        text-transform: uppercase; 
-        font-size: 11px !important; 
-        letter-spacing: 0.5px; 
-    }
+    div[data-testid="stMetric"] label { color: #8899B0 !important; font-weight: 500 !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.5px; }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
         color: #FFFFFF !important;
         font-family: 'Inter', sans-serif;
         font-weight: 700;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px; background-color: #0C1425; border-radius: 10px; 
-        padding: 4px; border: 1px solid #1A2744;
+        gap: 4px; background-color: #0C1425; border-radius: 10px; padding: 4px; border: 1px solid #1A2744;
     }
     .stTabs [data-baseweb="tab"] { color: #8899B0; border-radius: 8px; font-weight: 500; }
     .stTabs [aria-selected="true"] { background-color: #1400FF !important; color: #FFFFFF !important; }
@@ -64,8 +57,7 @@ st.markdown("""
     .stDataFrame { border: 1px solid #1A2744; border-radius: 10px; overflow: hidden; }
     hr { border-color: #1A2744; }
     div[data-testid="stFileUploader"] {
-        background-color: #0F1A2E; border: 2px dashed #1A2744; 
-        border-radius: 12px; padding: 16px;
+        background-color: #0F1A2E; border: 2px dashed #1A2744; border-radius: 12px; padding: 16px;
     }
     div[data-testid="stFileUploader"]:hover { border-color: #1400FF; }
     div[data-testid="stSidebar"] .stRadio label { color: #8899B0 !important; }
@@ -414,12 +406,8 @@ def create_area_chart(df, col_names):
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
         name='Necessidade (ton)',
-        hovertemplate=(
-            '%{x}/2026  
-'
-            '<b>%{y:,.0f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{x}/2026  
+<b>%{y:,.0f} ton</b><extra></extra>""",
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -448,13 +436,9 @@ def create_unidade_pie_chart(df, col_media):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate=(
-            '%{label}  
-'
-            '<b>%{value:,.1f} ton</b>  
-'
-            '%{percent}<extra></extra>'
-        ),
+        hovertemplate="""%{label}  
+<b>%{value:,.1f} ton</b>  
+%{percent}<extra></extra>""",
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -500,13 +484,9 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate=(
-            '%{label}  
-'
-            '<b>%{value:,.1f} ton</b>  
-'
-            '%{percent}<extra></extra>'
-        ),
+        hovertemplate="""%{label}  
+<b>%{value:,.1f} ton</b>  
+%{percent}<extra></extra>""",
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -537,12 +517,8 @@ def create_thickness_chart(df, col_media):
         x=[str(x) for x in dist.index],
         y=dist.values.tolist(),
         marker=dict(color=CHART_COLORS[:len(dist)]),
-        hovertemplate=(
-            '%{x} mm  
-'
-            '<b>%{y:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{x} mm  
+<b>%{y:,.1f} ton</b><extra></extra>""",
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -568,23 +544,15 @@ def create_progress_chart(df_unidades):
         name='Peso Total',
         x=unidades, y=peso_total,
         marker=dict(color=colors, opacity=0.4),
-        hovertemplate=(
-            '%{x}  
-'
-            'Peso Total: <b>%{y:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{x}  
+Peso Total: <b>%{y:,.1f} ton</b><extra></extra>""",
     ))
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
         marker=dict(color=colors, opacity=1.0),
-        hovertemplate=(
-            '%{x}  
-'
-            'Analisado: <b>%{y:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{x}  
+Analisado: <b>%{y:,.1f} ton</b><extra></extra>""",
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -608,12 +576,8 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate=(
-            '%{y}  
-'
-            '<b>%{x:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{y}  
+<b>%{x:,.1f} ton</b><extra></extra>""",
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -636,12 +600,8 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate=(
-            '%{y}  
-'
-            '<b>%{x:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
+        hovertemplate="""%{y}  
+<b>%{x:,.1f} ton</b><extra></extra>""",
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -651,236 +611,6 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
-def create_unidade_bar_chart(df, col_media):
-    """Gráfico de barras por unidade Delga com cores padronizadas."""
-    unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
-    if not unidade_col:
-        return None
-    df_valid = df[df[unidade_col[0]].notna() & (df[unidade_col[0]].astype(str).str.strip() != '')].copy()
-    if len(df_valid) == 0:
-        return None
-    dist = df_valid.groupby(unidade_col[0])[col_media].sum().sort_values(ascending=True)
-    colors = get_unidade_colors_list(dist.index)
-    fig = go.Figure(data=[go.Bar(
-        x=dist.values.tolist(),
-        y=[str(x) for x in dist.index],
-        orientation='h',
-        marker=dict(color=colors),
-        hovertemplate=(
-            '%{y}  
-'
-            '<b>%{x:,.1f} ton</b>'
-            '<extra></extra>'
-        ),
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Necessidade por Unidade Delga (ton)", font=dict(size=16, color=COLORS["cyan"])),
-        height=350,
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
-    )
-    return fig
-
-
-def create_ganho_unidade_chart(df_unidades):
-    """Gráfico de ganho financeiro por unidade com cores padronizadas."""
-    if len(df_unidades) == 0:
-        return None
-    df_g = df_unidades[df_unidades['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    df_g = df_g.sort_values('ganho', ascending=True)
-    colors = get_unidade_colors_list(df_g['unidade'])
-    fig = go.Figure(data=[go.Bar(
-        x=df_g['ganho'].tolist(),
-        y=df_g['unidade'].tolist(),
-        orientation='h',
-        marker=dict(color=colors),
-        hovertemplate=(
-            '%{y}  
-'
-            '<b>R$ %{x:,.0f}</b>'
-            '<extra></extra>'
-        ),
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho Financeiro por Unidade (R$)", font=dict(size=16, color=COLORS["cyan"])),
-        xaxis=dict(title="R$", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        height=350,
-    )
-    return fig
-
-
-def create_ganho_pie_chart(df_unidades):
-    """Gráfico de pizza do ganho financeiro por unidade."""
-    if len(df_unidades) == 0:
-        return None
-    df_g = df_unidades[df_unidades['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    colors = get_unidade_colors_list(df_g['unidade'])
-    fig = go.Figure(data=[go.Pie(
-        labels=df_g['unidade'].tolist(),
-        values=df_g['ganho'].tolist(),
-        hole=0.45,
-        marker=dict(colors=colors),
-        textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate=(
-            '%{label}  
-'
-            '<b>R$ %{value:,.0f}</b>  
-'
-            '%{percent}<extra></extra>'
-        ),
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho Financeiro por Unidade", font=dict(size=16, color=COLORS["cyan"])),
-        height=400,
-    )
-    return fig
-
-
-def create_ganho_usinas_chart(df_usinas):
-    """Gráfico de ganho financeiro por usina."""
-    if len(df_usinas) == 0:
-        return None
-    df_g = df_usinas[df_usinas['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    df_g = df_g.sort_values('ganho', ascending=True)
-    fig = go.Figure(data=[go.Bar(
-        x=df_g['ganho'].tolist(),
-        y=df_g['usina'].tolist(),
-        orientation='h',
-        marker=dict(color=COLORS["emerald"]),
-        hovertemplate=(
-            '%{y}  
-'
-            '<b>R$ %{x:,.0f}</b>'
-            '<extra></extra>'
-        ),
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho por Usina (R$)", font=dict(size=16, color=COLORS["cyan"])),
-        xaxis=dict(title="R$", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        height=max(400, len(df_g) * 30),
-    )
-    return fig
-
-
-# ============================================================
-# HELPER: renderizar gráfico com theme=None
-# ============================================================
-def render_chart(fig):
-    """Renderiza um gráfico Plotly no Streamlit com theme=None para evitar override de cores."""
-    if fig is not None:
-        st.plotly_chart(fig, use_container_width=True, theme=None)
-        return True
-    return False
-
-
-# ============================================================
-# APLICAÇÃO PRINCIPAL
-# ============================================================
-def main():
-    # SIDEBAR
-    with st.sidebar:
-        st.image("logo_delga.png", use_container_width=True)
-        st.markdown("""
-        <div style="text-align:center; padding:8px 0 16px 0;">
-            <p style="color:#8899B0; font-size:11px; margin:0; text-transform:uppercase; letter-spacing:1.5px; font-weight:600;">Controle de Matéria-Prima</p>
-        </div>
-        <hr style="border-color:#1A2744; margin:0 0 16px 0;">
-        """, unsafe_allow_html=True)
-
-        # ── ÁREA ADMIN (protegida por senha) ──
-        st.markdown("#### 🔐 Área do Administrador")
-        with st.expander("Atualizar Dados (requer senha)", expanded=False):
-            senha = st.text_input("Senha:", type="password", key="admin_pwd")
-            if senha == ADMIN_PASSWORD:
-                st.success("Acesso liberado!")
-                admin_file = st.file_uploader(
-                    "Envie o Excel atualizado:",
-                    type=["xlsx", "xls"],
-                    key="admin_upload",
-                    help="O arquivo será salvo e ficará disponível para todos os visitantes.",
-                )
-                if admin_file:
-                    if st.button("📤 Salvar e Publicar Dados", type="primary"):
-                        with st.spinner("Salvando dados no servidor..."):
-                            file_bytes = admin_file.getvalue()
-                            success, msg = save_data_to_github(file_bytes, admin_file.name)
-                        if success:
-                            st.success(f"✅ {msg}")
-                            st.info("Os dados já estão disponíveis para todos os visitantes!")
-                            st.balloons()
-                        else:
-                            st.error(f"❌ {msg}")
-            elif senha and senha != ADMIN_PASSWORD:
-                st.error("Senha incorreta.")
-
-        st.markdown("---")
-
-        # Legenda de cores das unidades
-        st.markdown("#### Cores por Unidade")
-        for unidade, cor in UNIDADE_COLORS.items():
-            st.markdown(
-                f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">'
-                f'<div style="width:16px;height:16px;border-radius:4px;background:{cor};"></div>'
-                f'<span style="color:#B0BEC5;font-size:13px;">{unidade}</span></div>',
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("---")
-        st.markdown("""
-        <div style="padding:10px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border-radius:10px; border:1px solid #1A2744; margin-top:8px;">
-            <p style="color:#5A7090; font-size:11px; margin:0; line-height:1.6;">
-                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.  
-
-                <b style="color:#8899B0;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # HEADER
-    st.markdown("""
-    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #1A2744;">
-        <div style="background:linear-gradient(135deg, #1400FF 0%, #0A00AA 100%); border-radius:12px; padding:14px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(20,0,255,0.3);">
-            <span style="font-size:24px; color:white; font-weight:800; font-family:'Inter',sans-serif;">BSW</span>
-        </div>
-        <div>
-            <h1 style="margin:0; font-size:26px; color:#FFFFFF !important; font-weight:800; letter-spacing:-0.5px;">Controle de Matéria-Prima</h1>
-            <p style="margin:4px 0 0 0; color:#5A7090; font-size:12px; font-weight:500; letter-spacing:0.5px;">BOBINAS BSW — JAN A MAI / 2026 | GRUPO DELGA</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ============================================================
-    # CARREGAR DADOS (prioridade: GitHub > SharePoint > vazio)
-    # ============================================================
-    df_raw = None
-    df_formulas = None
-
-    # Tentar carregar do GitHub (dados persistidos)
-    try:
-        df_raw, df_formulas = load_data_from_github()
-    except Exception:
-        df_raw, df_formulas = None, None
-
-    # Se não tem dados no GitHub, tentar SharePoint
-    if df_raw is None:
-        try:
-            df_raw, df_formulas = load_data_from_sharepoint()
-        except Exception:
-            df_raw, df_formulas = None, None
-
     # Se não tem dados de nenhuma fonte
     if df_raw is None:
         st.markdown("""
@@ -1343,14 +1073,9 @@ def main():
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
                             customdata=acum_values,
-                            hovertemplate=(
-                                '%{x|%b/%Y}  
-'
-                                'Ganho Mês: <b>R$ %{y:,.0f}</b>  
-'
-                                'Acumulado: <b>R$ %{customdata:,.0f}</b>'
-                                '<extra>' + nome_unidade + '</extra>'
-                            )
+                            hovertemplate="""%{x|%b/%Y}  
+Ganho Mês: <b>R$ %{y:,.0f}</b>  
+Acumulado: <b>R$ %{customdata:,.0f}</b><extra>""" + nome_unidade + """</extra>"""
                         ))
 
                     # Linha Total Geral (azul mais forte, mais grossa)
@@ -1363,14 +1088,9 @@ def main():
                         line=dict(color='#1400FF', width=3.5),
                         marker=dict(size=7),
                         customdata=acum_total,
-                        hovertemplate=(
-                            '%{x|%b/%Y}  
-'
-                            'Ganho Mês: <b>R$ %{y:,.0f}</b>  
-'
-                            'Acumulado: <b>R$ %{customdata:,.0f}</b>'
-                            '<extra>Total Geral</extra>'
-                        )
+                        hovertemplate="""%{x|%b/%Y}  
+Ganho Mês: <b>R$ %{y:,.0f}</b>  
+Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>"""
                     ))
 
                     fig_tl.update_layout(
