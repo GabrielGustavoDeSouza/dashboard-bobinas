@@ -402,8 +402,7 @@ def create_area_chart(df, col_names):
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
         name='Necessidade (ton)',
-        hovertemplate='%{x}/2026  
-<b>%{y:,.0f} ton</b><extra></extra>',
+        hovertemplate='%{x}/2026 <b>%{y:,.0f} ton</b><extra></extra>',
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -432,9 +431,7 @@ def create_unidade_pie_chart(df, col_media):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>%{value:,.1f} ton</b>  
-%{percent}<extra></extra>',
+        hovertemplate='%{label}  <b>%{value:,.1f} ton</b>  %{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -480,10 +477,7 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>%{value:,.1f} ton</b>  
-%{percent}<extra></extra>',
-    )])
+        hovertemplate='%{label}<b>%{value:,.1f} ton</b> %{percent}<extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Tipo de Bobina", font=dict(size=16, color=COLORS["cyan"])),
@@ -513,8 +507,7 @@ def create_thickness_chart(df, col_media):
         x=[str(x) for x in dist.index],
         y=dist.values.tolist(),
         marker=dict(color=CHART_COLORS[:len(dist)]),
-        hovertemplate='%{x} mm  
-<b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{x} mm  <b>%{y:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -572,9 +565,7 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Top Usinas por Peso (ton)", font=dict(size=16, color=COLORS["cyan"])),
@@ -596,9 +587,7 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
-    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
@@ -622,8 +611,7 @@ def create_unidade_bar_chart(df, col_media):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  
-<b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -649,8 +637,7 @@ def create_ganho_unidade_chart(df_unidades):
         y=df_g['unidade'].tolist(),
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  
-<b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -677,9 +664,7 @@ def create_ganho_pie_chart(df_unidades):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  
-<b>R$ %{value:,.0f}</b>  
-%{percent}<extra></extra>',
+        hovertemplate='%{label} <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -702,8 +687,7 @@ def create_ganho_usinas_chart(df_usinas):
         y=df_g['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["emerald"]),
-        hovertemplate='%{y}  
-<b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
