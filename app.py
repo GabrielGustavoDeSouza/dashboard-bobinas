@@ -860,10 +860,7 @@ def main():
     # ============================================================
     # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
-    if len(df_unidades) > 0:
-        st.markdown("  
-", unsafe_allow_html=True)
-        st.markdown("#### Detalhamento por Unidade")
+    if len(df_unidades) > 0:        st.markdown("  ", unsafe_allow_html=True)        st.markdown("#### Detalhamento por Unidade")
 
         col_sel1, col_sel2 = st.columns([2, 1])
         with col_sel1:
