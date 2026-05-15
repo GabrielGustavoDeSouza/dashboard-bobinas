@@ -967,8 +967,7 @@ def main():
         with uk5:
             st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
 
-    st.markdown("  
-", unsafe_allow_html=True)
+    st.markdown("  ", unsafe_allow_html=True)
     # ============================================================
     # ABAS
     # ============================================================
@@ -1260,9 +1259,7 @@ def main():
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
                             customdata=acum_values,
-                            hovertemplate='%{x|%b/%Y}  
-Ganho Mês: <b>R$ %{y:,.0f}</b>  
-Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
+                            hovertemplate='%{x|%b/%Y}  Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
                         ))
 
                     # Linha Total Geral (azul mais forte, mais grossa)
@@ -1275,9 +1272,7 @@ Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
                         line=dict(color='#1400FF', width=3.5),
                         marker=dict(size=7),
                         customdata=acum_total,
-                        hovertemplate='%{x|%b/%Y}  
-Ganho Mês: <b>R$ %{y:,.0f}</b>  
-Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
+                        hovertemplate='%{x|%b/%Y} Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
                     ))
 
                     fig_tl.update_layout(
