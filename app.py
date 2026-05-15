@@ -998,31 +998,6 @@ def main():
         if not render_chart(fig_usinas):
             st.info("Dados de usinas não encontrados na aba Formulas.")
 
-        # Tabela Top 15 Bobinas
-        st.markdown("### Top 15 Bobinas por Necessidade Média")
-        codigo_col = [c for c in df.columns if 'Código' in c and 'Bobina' in c]
-        if codigo_col:
-            display_cols = [codigo_col[0]]
-            tipo_col_list = [c for c in df.columns if c.strip() == 'Tipo']
-            if tipo_col_list:
-                display_cols.append(tipo_col_list[0])
-            unidade_col_list = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
-            if unidade_col_list:
-                display_cols.append(unidade_col_list[0])
-            if 'Projeto' in df.columns:
-                display_cols.append('Projeto')
-            display_cols.append(col_media)
-
-            top15 = df.nlargest(15, col_media)[display_cols].copy()
-            rename_map = {codigo_col[0]: 'Código Bobina', col_media: 'Necessidade Média (ton)'}
-            if unidade_col_list:
-                rename_map[unidade_col_list[0]] = 'Unidade'
-            top15 = top15.rename(columns=rename_map)
-            top15['Necessidade Média (ton)'] = top15['Necessidade Média (ton)'].round(1)
-            top15 = top15.reset_index(drop=True)
-            top15.index = top15.index + 1
-            st.dataframe(top15, use_container_width=True, height=560)
-
     # ── ABA 2: ANÁLISES ──
     with tab2:
         if len(df_unidades) > 0:
