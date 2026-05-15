@@ -40,14 +40,21 @@ st.markdown("""
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    div[data-testid="stMetric"] label { color: #8899B0 !important; font-weight: 500 !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.5px; }
+    div[data-testid="stMetric"] label { 
+        color: #8899B0 !important; 
+        font-weight: 500 !important; 
+        text-transform: uppercase; 
+        font-size: 11px !important; 
+        letter-spacing: 0.5px; 
+    }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
         color: #FFFFFF !important;
         font-family: 'Inter', sans-serif;
         font-weight: 700;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px; background-color: #0C1425; border-radius: 10px; padding: 4px; border: 1px solid #1A2744;
+        gap: 4px; background-color: #0C1425; border-radius: 10px; 
+        padding: 4px; border: 1px solid #1A2744;
     }
     .stTabs [data-baseweb="tab"] { color: #8899B0; border-radius: 8px; font-weight: 500; }
     .stTabs [aria-selected="true"] { background-color: #1400FF !important; color: #FFFFFF !important; }
@@ -57,7 +64,8 @@ st.markdown("""
     .stDataFrame { border: 1px solid #1A2744; border-radius: 10px; overflow: hidden; }
     hr { border-color: #1A2744; }
     div[data-testid="stFileUploader"] {
-        background-color: #0F1A2E; border: 2px dashed #1A2744; border-radius: 12px; padding: 16px;
+        background-color: #0F1A2E; border: 2px dashed #1A2744; 
+        border-radius: 12px; padding: 16px;
     }
     div[data-testid="stFileUploader"]:hover { border-color: #1400FF; }
     div[data-testid="stSidebar"] .stRadio label { color: #8899B0 !important; }
@@ -200,7 +208,8 @@ def save_data_to_github(file_bytes, filename):
         load_data_from_github.clear()
         return True, "Dados atualizados com sucesso!"
     else:
-        return False, f"Erro ao salvar: {response.status_code} - {response.json().get('message', '')}"
+        erro_msg = response.json().get('message', '')
+        return False, f"Erro ao salvar: {response.status_code} - {erro_msg}"
 
 
 # ============================================================
@@ -230,13 +239,16 @@ def load_data_from_sharepoint():
     site_domain = st.secrets["SHAREPOINT_DOMAIN"]
     site_path = st.secrets["SHAREPOINT_SITE_PATH"]
     file_path = st.secrets["SHAREPOINT_FILE_PATH"]
+    
     site_url = f"https://graph.microsoft.com/v1.0/sites/{site_domain}:/sites/{site_path}"
     site_resp = requests.get(site_url, headers=headers )
     site_resp.raise_for_status()
     site_id = site_resp.json()["id"]
+    
     file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_path}:/content"
     file_resp = requests.get(file_url, headers=headers )
     file_resp.raise_for_status()
+    
     excel_bytes = io.BytesIO(file_resp.content)
     df_controle = smart_read_excel(excel_bytes, "Controle")
     excel_bytes.seek(0)
@@ -295,7 +307,6 @@ def process_data(df_raw):
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
     return df, col_names
-
 def parse_formulas(df_formulas):
     """Extrai dados estruturados da aba Formulas."""
     unidades = []
@@ -403,7 +414,12 @@ def create_area_chart(df, col_names):
         mode='lines+markers',
         marker=dict(size=10, color=COLORS["cyan"]),
         name='Necessidade (ton)',
-        hovertemplate='%{x}/2026  <b>%{y:,.0f} ton</b><extra></extra>',
+        hovertemplate=(
+            '%{x}/2026  
+'
+            '<b>%{y:,.0f} ton</b>'
+            '<extra></extra>'
+        ),
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -432,7 +448,13 @@ def create_unidade_pie_chart(df, col_media):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  <b>%{value:,.1f} ton</b>%{percent}<extra></extra>',
+        hovertemplate=(
+            '%{label}  
+'
+            '<b>%{value:,.1f} ton</b>  
+'
+            '%{percent}<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -478,7 +500,13 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label} <b>%{value:,.1f} ton</b>%{percent}<extra></extra>',
+        hovertemplate=(
+            '%{label}  
+'
+            '<b>%{value:,.1f} ton</b>  
+'
+            '%{percent}<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -509,7 +537,12 @@ def create_thickness_chart(df, col_media):
         x=[str(x) for x in dist.index],
         y=dist.values.tolist(),
         marker=dict(color=CHART_COLORS[:len(dist)]),
-        hovertemplate='%{x} mm <b>%{y:,.1f} ton</b><extra></extra>',
+        hovertemplate=(
+            '%{x} mm  
+'
+            '<b>%{y:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -534,12 +567,24 @@ def create_progress_chart(df_unidades):
     fig.add_trace(go.Bar(
         name='Peso Total',
         x=unidades, y=peso_total,
-        marker=dict(color=colors, opacity=0.4),        hovertemplate='%{x} Peso Total: <b>%{y:,.1f} ton</b><extra></extra>',
+        marker=dict(color=colors, opacity=0.4),
+        hovertemplate=(
+            '%{x}  
+'
+            'Peso Total: <b>%{y:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     ))
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
-        marker=dict(color=colors, opacity=1.0),        hovertemplate='%{x}  Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
+        marker=dict(color=colors, opacity=1.0),
+        hovertemplate=(
+            '%{x}  
+'
+            'Analisado: <b>%{y:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -563,7 +608,12 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate=(
+            '%{y}  
+'
+            '<b>%{x:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -586,7 +636,12 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate=(
+            '%{y}  
+'
+            '<b>%{x:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -596,7 +651,8 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
-    def create_unidade_bar_chart(df, col_media):    """Gráfico de barras por unidade Delga com cores padronizadas."""
+def create_unidade_bar_chart(df, col_media):
+    """Gráfico de barras por unidade Delga com cores padronizadas."""
     unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
     if not unidade_col:
         return None
@@ -610,7 +666,12 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
+        hovertemplate=(
+            '%{y}  
+'
+            '<b>%{x:,.1f} ton</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -636,7 +697,12 @@ def create_ganho_unidade_chart(df_unidades):
         y=df_g['unidade'].tolist(),
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate=(
+            '%{y}  
+'
+            '<b>R$ %{x:,.0f}</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -663,7 +729,13 @@ def create_ganho_pie_chart(df_unidades):
         marker=dict(colors=colors),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}  <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',
+        hovertemplate=(
+            '%{label}  
+'
+            '<b>R$ %{value:,.0f}</b>  
+'
+            '%{percent}<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -686,7 +758,12 @@ def create_ganho_usinas_chart(df_usinas):
         y=df_g['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["emerald"]),
-        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
+        hovertemplate=(
+            '%{y}  
+'
+            '<b>R$ %{x:,.0f}</b>'
+            '<extra></extra>'
+        ),
     )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
@@ -859,7 +936,10 @@ def main():
     # ============================================================
     # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
-    if len(df_unidades) > 0:        st.markdown("  ", unsafe_allow_html=True)        st.markdown("#### Detalhamento por Unidade")
+    if len(df_unidades) > 0:
+        st.markdown("  
+", unsafe_allow_html=True)
+        st.markdown("#### Detalhamento por Unidade")
 
         col_sel1, col_sel2 = st.columns([2, 1])
         with col_sel1:
@@ -964,7 +1044,10 @@ def main():
         with uk4:
             st.metric("Ganho Mensal", f"R$ {u_ganho:,.0f}".replace(",", "."))
         with uk5:
-            st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))    st.markdown("  ", unsafe_allow_html=True)
+            st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
+
+    st.markdown("  
+", unsafe_allow_html=True)
     # ============================================================
     # ABAS
     # ============================================================
@@ -1260,7 +1343,14 @@ def main():
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
                             customdata=acum_values,
-                            hovertemplate='%{x|%b/%Y}  Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + nome_unidade + '</extra>'
+                            hovertemplate=(
+                                '%{x|%b/%Y}  
+'
+                                'Ganho Mês: <b>R$ %{y:,.0f}</b>  
+'
+                                'Acumulado: <b>R$ %{customdata:,.0f}</b>'
+                                '<extra>' + nome_unidade + '</extra>'
+                            )
                         ))
 
                     # Linha Total Geral (azul mais forte, mais grossa)
@@ -1273,7 +1363,14 @@ def main():
                         line=dict(color='#1400FF', width=3.5),
                         marker=dict(size=7),
                         customdata=acum_total,
-                        hovertemplate='%{x|%b/%Y}  Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
+                        hovertemplate=(
+                            '%{x|%b/%Y}  
+'
+                            'Ganho Mês: <b>R$ %{y:,.0f}</b>  
+'
+                            'Acumulado: <b>R$ %{customdata:,.0f}</b>'
+                            '<extra>Total Geral</extra>'
+                        )
                     ))
 
                     fig_tl.update_layout(
@@ -1316,4 +1413,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
