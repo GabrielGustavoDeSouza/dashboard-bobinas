@@ -674,8 +674,7 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         col_sel1, col_sel2 = st.columns([2, 1])
         with col_sel1:
             unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
-            selected_unidade = st.selectbox(
-                "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
+            selected_unidade = st.selectbox( "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
             )
         with col_sel2:
             st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
