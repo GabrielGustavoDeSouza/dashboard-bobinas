@@ -666,9 +666,7 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
     # ============================================================
     # SELETOR DE UNIDADE E FILTRO DE ANO
     # ============================================================
-    if len(df_unidades) > 0:
-        st.markdown("  
-", unsafe_allow_html=True)
+    if len(df_unidades) > 0:st.markdown(" ", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
         col_sel1, col_sel2 = st.columns([2, 1])
