@@ -596,8 +596,7 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
-    def create_unidade_bar_chart(df, col_media):
-    """Gráfico de barras por unidade Delga com cores padronizadas."""
+    def create_unidade_bar_chart(df, col_media):    """Gráfico de barras por unidade Delga com cores padronizadas."""
     unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
     if not unidade_col:
         return None
