@@ -539,9 +539,7 @@ def create_progress_chart(df_unidades):
     fig.add_trace(go.Bar(
         name='Peso Analisado',
         x=unidades, y=peso_analisado,
-        marker=dict(color=colors, opacity=1.0),
-        hovertemplate='%{x}  
-Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
+        marker=dict(color=colors, opacity=1.0),        hovertemplate='%{x}  Analisado: <b>%{y:,.1f} ton</b><extra></extra>',
     ))
     fig.update_layout(
         **PLOTLY_LAYOUT,
