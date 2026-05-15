@@ -292,7 +292,7 @@ def process_data(df_raw):
             col_names[key] = cols[0]
 
     for key, col in col_names.items():
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        df[col] = df[col].apply(parse_numero_brasileiro)
 
     return df, col_names
 def parse_formulas(df_formulas):
@@ -697,6 +697,42 @@ def create_ganho_usinas_chart(df_usinas):
     return fig
 
 
+
+def parse_numero_brasileiro(valor):
+    """Converte número, moeda ou texto BR/US para float com segurança."""
+    if pd.isna(valor):
+        return 0.0
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    txt = str(valor).strip()
+    if not txt or txt.lower() in ["nan", "none", "-", ""]:
+        return 0.0
+    txt = (txt.replace("R$", "")
+              .replace(" ", "")
+              .replace(" ", ""))
+    # BR: 1.234,56 | US: 1,234.56 | simples: 1234,56
+    if "," in txt and "." in txt:
+        if txt.rfind(",") > txt.rfind("."):
+            txt = txt.replace(".", "").replace(",", ".")
+        else:
+            txt = txt.replace(",", "")
+    elif "," in txt:
+        txt = txt.replace(".", "").replace(",", ".")
+    try:
+        return float(txt)
+    except Exception:
+        return 0.0
+
+
+def normalizar_unidade(valor):
+    """Evita erro no Plotly quando unidade vem vazia/NaN."""
+    if pd.isna(valor):
+        return "Desconhecida"
+    txt = str(valor).strip()
+    if not txt or txt.lower() in ["nan", "none"]:
+        return "Desconhecida"
+    return txt
+
 # ============================================================
 # HELPER: renderizar gráfico com theme=None
 # ============================================================
@@ -898,13 +934,14 @@ def main():
 
         if ganho_prev_col and ganho_mensal_col and unidade_col_tl:
             df_calc = df.copy()
+            df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
             if selected_unidade != "Todas":
                 df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
             
             col_prev = ganho_prev_col[0]
             col_ganho_m = ganho_mensal_col[0]
             
-            df_calc['ganho_num'] = pd.to_numeric(df_calc[col_ganho_m], errors='coerce').fillna(0)
+            df_calc['ganho_num'] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
             df_calc = df_calc[df_calc['ganho_num'] > 0]
             
             meses_map = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6, 'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12, 'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4, 'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9, 'outubro':10, 'novembro':11, 'dezembro':12}
@@ -1100,7 +1137,8 @@ def main():
             col_unid = unidade_col_tl[0]
 
             df_tl = df[[col_unid, col_ganho_m, col_prev]].copy()
-            df_tl['ganho_num'] = pd.to_numeric(df_tl[col_ganho_m], errors='coerce').fillna(0)
+            df_tl[col_unid] = df_tl[col_unid].apply(normalizar_unidade)
+            df_tl['ganho_num'] = df_tl[col_ganho_m].apply(parse_numero_brasileiro)
             df_tl = df_tl[df_tl['ganho_num'] > 0].copy()
             df_tl['primeiro_ganho_str'] = df_tl[col_prev].astype(str).str.strip()
 
@@ -1211,8 +1249,8 @@ def main():
                             mes_atual = inicio + pd.DateOffset(months=m)
                             if mes_atual in meses_range:
                                 if unidade in timeline_data:
-                                    timeline_data[unidade][mes_atual] += ganho
-                                timeline_data['Total Geral'][mes_atual] += ganho
+                                    timeline_data[unidade].loc[mes_atual] += ganho
+                                timeline_data['Total Geral'].loc[mes_atual] += ganho
 
                     # Calcular acumulado por unidade
                     acumulado_data = {}
@@ -1293,4 +1331,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        st.error("O dashboard encontrou um erro e foi protegido para não ficar em tela branca.")
+        st.exception(e)
