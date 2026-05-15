@@ -1239,20 +1239,25 @@ def main():
                     # Criar gráfico
                     fig_tl = go.Figure()
 
-                    # Adicionar linha de cada unidade
+                                       # Adicionar linha de cada unidade
                     for unidade in unidades_presentes:
-                        color = get_unidade_color(unidade)
+                        nome_unidade = str(unidade) # Força a ser texto para não dar erro
+                        if nome_unidade.lower() == 'nan' or nome_unidade.strip() == '':
+                            continue # Pula se a linha estiver com a unidade vazia
+                            
+                        color = get_unidade_color(nome_unidade)
                         acum_values = acumulado_data[unidade].values
                         fig_tl.add_trace(go.Scatter(
                             x=meses_range,
                             y=timeline_data[unidade].values,
                             mode='lines+markers',
-                            name=unidade,
+                            name=nome_unidade,
                             line=dict(color=color, width=2),
                             marker=dict(size=5),
                             customdata=acum_values,
-                            hovertemplate='%{x|%b/%Y} Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + unidade + '</extra>'
+                            hovertemplate='%{x|%b/%Y}  Ganho Mês: <b>R$ %{y:,.0f}</b> Acumulado: <b>R$ %{customdata:,.0f}</b><extra>' + nome_unidade + '</extra>'
                         ))
+
 
                     # Linha Total Geral (azul mais forte, mais grossa)
                     acum_total = acumulado_data['Total Geral'].values
