@@ -1247,7 +1247,7 @@ def main():
                     # Criar gráfico
                     fig_tl = go.Figure()
 
-                                        # Adicionar linha de cada unidade
+                    # Adicionar linha de cada unidade
                     for unidade in unidades_presentes:
                         color = get_unidade_color(unidade)
                         acum_values = acumulado_data[unidade].values
@@ -1265,7 +1265,6 @@ def main():
                             customdata=acum_values,
                             hovertemplate=f'%{{x|%b/%Y}}  Ganho Mês: <b>R$ %{{y:,.0f}}</b>  Acumulado: <b>R$ %{{customdata:,.0f}}</b><extra>{unidade_texto}</extra>'
                         ))
-
 
                     # Linha Total Geral (azul mais forte, mais grossa)
                     acum_total = acumulado_data['Total Geral'].values
