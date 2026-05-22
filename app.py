@@ -733,6 +733,177 @@ def normalizar_unidade(valor):
         return "Desconhecida"
     return txt
 
+
+def is_validado_sim(valor):
+    """Retorna True quando a coluna Validado (USINA/CUSTOS) estiver marcada como SIM."""
+    if pd.isna(valor):
+        return False
+    txt = str(valor).strip().upper()
+    return txt in ["SIM", "S", "YES", "Y", "1", "TRUE", "VERDADEIRO"]
+
+
+def render_kpi_card(titulo, valor, modo="previsto"):
+    """Renderiza card KPI customizado. No modo validado usa tom verde."""
+    if modo == "validado":
+        bg = "linear-gradient(135deg, #0B2A1A 0%, #123D27 100%)"
+        border = "#1F7A46"
+        title_color = "#B7F7D0"
+        value_color = "#D8FFE8"
+        shadow = "0 4px 16px rgba(0,230,118,0.10)"
+    else:
+        bg = "linear-gradient(135deg, #0F1A2E 0%, #132040 100%)"
+        border = "#1A2744"
+        title_color = "#B7D7FF"
+        value_color = "#CFE4FF"
+        shadow = "0 4px 12px rgba(0,0,0,0.3)"
+
+    st.markdown(
+        f"""
+        <div style="
+            background:{bg};
+            border:1px solid {border};
+            border-radius:12px;
+            padding:20px 18px;
+            min-height:91px;
+            box-shadow:{shadow};
+        ">
+            <div style="
+                color:{title_color};
+                font-size:11px;
+                font-weight:700;
+                text-transform:uppercase;
+                letter-spacing:.6px;
+                margin-bottom:8px;
+            ">{titulo}</div>
+            <div style="
+                color:{value_color};
+                font-size:30px;
+                line-height:1.15;
+                font-weight:800;
+                font-family:Inter, Arial, sans-serif;
+            ">{valor}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def calcular_ganho_acumulado_ano(df_base, selected_unidade, ano_alvo, somente_validado=False):
+    """Calcula ganho acumulado no ano escolhido considerando 12 meses a partir do Primeiro Ganho Previsto."""
+    ganho_acumulado_ano = 0.0
+
+    ganho_prev_col = [c for c in df_base.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
+    ganho_mensal_col = [c for c in df_base.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
+    unidade_col_tl = [c for c in df_base.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
+    validado_col = [c for c in df_base.columns if 'validado' in str(c).lower()]
+
+    if not (ganho_prev_col and ganho_mensal_col and unidade_col_tl):
+        return 0.0
+
+    df_calc = df_base.copy()
+    df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
+
+    if selected_unidade != "Todas":
+        df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
+
+    if somente_validado:
+        if validado_col:
+            df_calc = df_calc[df_calc[validado_col[0]].apply(is_validado_sim)]
+        else:
+            return 0.0
+
+    col_prev = ganho_prev_col[0]
+    col_ganho_m = ganho_mensal_col[0]
+
+    df_calc['ganho_num'] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
+    df_calc = df_calc[df_calc['ganho_num'] > 0]
+
+    meses_map = {
+        'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
+        'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12,
+        'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4,
+        'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9,
+        'outubro':10, 'novembro':11, 'dezembro':12
+    }
+
+    def parse_mes_ano_simples(val):
+        try:
+            if isinstance(val, (pd.Timestamp,)):
+                return val.replace(day=1)
+            import datetime
+            if isinstance(val, datetime.datetime):
+                return pd.Timestamp(val).replace(day=1)
+
+            val_str = str(val).strip().lower()
+            try:
+                parsed = pd.to_datetime(val_str)
+                if pd.notna(parsed):
+                    return parsed.replace(day=1)
+            except:
+                pass
+
+            for sep in [',', ' ']:
+                if sep in val_str:
+                    parts = [p.strip() for p in val_str.split(sep) if p.strip()]
+                    if len(parts) == 2:
+                        mes = meses_map.get(parts[0].lower())
+                        if mes:
+                            ano = int(parts[1])
+                            if ano < 100:
+                                ano += 2000
+                            return pd.Timestamp(year=ano, month=mes, day=1)
+
+            for sep in ['/', '-']:
+                if sep in val_str:
+                    parts = val_str.split(sep)
+                    if len(parts) == 2:
+                        mes = meses_map.get(parts[0].strip()[:3])
+                        if mes:
+                            ano = int(parts[1].strip())
+                            if ano < 100:
+                                ano += 2000
+                            return pd.Timestamp(year=ano, month=mes, day=1)
+        except:
+            pass
+        return None
+
+    df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_simples)
+    df_calc = df_calc[df_calc['data_inicio'].notna()]
+
+    for _, row in df_calc.iterrows():
+        inicio = row['data_inicio']
+        ganho = row['ganho_num']
+        meses_no_ano = 0
+        for m in range(12):
+            mes_atual = inicio + pd.DateOffset(months=m)
+            if mes_atual.year == int(ano_alvo):
+                meses_no_ano += 1
+        ganho_acumulado_ano += (ganho * meses_no_ano)
+
+    return float(ganho_acumulado_ano)
+
+
+def calcular_ganho_mensal_validado(df_base, selected_unidade):
+    """Soma o ganho mensal apenas das bobinas marcadas como SIM na coluna Validado."""
+    ganho_mensal_col = [c for c in df_base.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
+    unidade_col_tl = [c for c in df_base.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
+    validado_col = [c for c in df_base.columns if 'validado' in str(c).lower()]
+
+    if not (ganho_mensal_col and unidade_col_tl and validado_col):
+        return 0.0
+
+    df_calc = df_base.copy()
+    df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
+
+    if selected_unidade != "Todas":
+        df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
+
+    df_calc = df_calc[df_calc[validado_col[0]].apply(is_validado_sim)]
+    df_calc['ganho_num'] = df_calc[ganho_mensal_col[0]].apply(parse_numero_brasileiro)
+
+    return float(df_calc['ganho_num'].sum())
+
+
 # ============================================================
 # HELPER: renderizar gráfico com theme=None
 # ============================================================
@@ -898,7 +1069,7 @@ def main():
         st.markdown("  ", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
-        col_sel1, col_sel2 = st.columns([2, 1])
+        col_sel1, col_sel2, col_sel3 = st.columns([2, 0.9, 0.7])
         with col_sel1:
             unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
             selected_unidade = st.selectbox(
@@ -907,90 +1078,44 @@ def main():
         with col_sel2:
             st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
             ano_selecionado = st.radio(
-                "Filtrar Ganho Acumulado no Ano:", 
-                ["2026", "2027", "2028"], 
+                "Filtrar Ganho Acumulado no Ano:",
+                ["2026", "2027", "2028"],
                 horizontal=True
             )
+        with col_sel3:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            modo_validado = st.toggle("✅ Validado", value=False, key="toggle_validado")
 
         if selected_unidade == "Todas":
             u_bobinas = total_bobinas
             u_peso = total_peso
             u_analisado = total_peso_analisado
-            u_ganho = total_ganho
+            u_ganho_previsto = total_ganho
             u_pct = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
         else:
             row_u = df_unidades[df_unidades['unidade'] == selected_unidade].iloc[0]
             u_bobinas = int(row_u['bobinas'])
             u_peso = float(row_u['peso_total'])
             u_analisado = float(row_u['peso_analisado'])
-            u_ganho = float(row_u['ganho'])
+            u_ganho_previsto = float(row_u['ganho'])
             u_pct = float(row_u['pct'])
 
-        # --- Lógica para calcular o ganho real no ano selecionado ---
-        ganho_acumulado_ano = 0
-        ganho_prev_col = [c for c in df.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
-        ganho_mensal_col = [c for c in df.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
-        unidade_col_tl = [c for c in df.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
-
-        if ganho_prev_col and ganho_mensal_col and unidade_col_tl:
-            df_calc = df.copy()
-            df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
-            if selected_unidade != "Todas":
-                df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
-            
-            col_prev = ganho_prev_col[0]
-            col_ganho_m = ganho_mensal_col[0]
-            
-            df_calc['ganho_num'] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
-            df_calc = df_calc[df_calc['ganho_num'] > 0]
-            
-            meses_map = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6, 'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12, 'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4, 'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9, 'outubro':10, 'novembro':11, 'dezembro':12}
-            
-            def parse_mes_ano_simples(val):
-                try:
-                    if isinstance(val, (pd.Timestamp,)): return val.replace(day=1)
-                    import datetime
-                    if isinstance(val, datetime.datetime): return pd.Timestamp(val).replace(day=1)
-                    val_str = str(val).strip().lower()
-                    try:
-                        parsed = pd.to_datetime(val_str)
-                        if pd.notna(parsed): return parsed.replace(day=1)
-                    except: pass
-                    for sep in [',', ' ']:
-                        if sep in val_str:
-                            parts = [p.strip() for p in val_str.split(sep) if p.strip()]
-                            if len(parts) == 2:
-                                mes = meses_map.get(parts[0].lower())
-                                if mes:
-                                    ano = int(parts[1])
-                                    if ano < 100: ano += 2000
-                                    return pd.Timestamp(year=ano, month=mes, day=1)
-                    for sep in ['/', '-']:
-                        if sep in val_str:
-                            parts = val_str.split(sep)
-                            if len(parts) == 2:
-                                mes = meses_map.get(parts[0].strip()[:3])
-                                if mes:
-                                    ano = int(parts[1].strip())
-                                    if ano < 100: ano += 2000
-                                    return pd.Timestamp(year=ano, month=mes, day=1)
-                except: pass
-                return None
-
-            df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_simples)
-            df_calc = df_calc[df_calc['data_inicio'].notna()]
-            
-            ano_alvo = int(ano_selecionado)
-            
-            for _, row in df_calc.iterrows():
-                inicio = row['data_inicio']
-                ganho = row['ganho_num']
-                meses_no_ano = 0
-                for m in range(12):
-                    mes_atual = inicio + pd.DateOffset(months=m)
-                    if mes_atual.year == ano_alvo:
-                        meses_no_ano += 1
-                ganho_acumulado_ano += (ganho * meses_no_ano)
+        if modo_validado:
+            titulo_mensal = "Ganho Mensal (Validado)"
+            titulo_anual = f"Ganho Acumulado em {ano_selecionado} (Validado)"
+            u_ganho_exibido = calcular_ganho_mensal_validado(df, selected_unidade)
+            ganho_acumulado_ano = calcular_ganho_acumulado_ano(
+                df, selected_unidade, int(ano_selecionado), somente_validado=True
+            )
+            modo_card = "validado"
+        else:
+            titulo_mensal = "Ganho Mensal (Previsto)"
+            titulo_anual = f"Ganho Acumulado em {ano_selecionado} (Previsto)"
+            u_ganho_exibido = u_ganho_previsto
+            ganho_acumulado_ano = calcular_ganho_acumulado_ano(
+                df, selected_unidade, int(ano_selecionado), somente_validado=False
+            )
+            modo_card = "previsto"
 
         uk1, uk2, uk3, uk4, uk5 = st.columns(5)
         with uk1:
@@ -1000,9 +1125,10 @@ def main():
         with uk3:
             st.metric("% Concluído", f"{u_pct:.1f}%")
         with uk4:
-            st.metric("Ganho Mensal", f"R$ {u_ganho:,.0f}".replace(",", "."))
+            render_kpi_card(titulo_mensal, f"R$ {u_ganho_exibido:,.0f}".replace(",", "."), modo_card)
         with uk5:
-            st.metric(f"Ganho Acumulado em {ano_selecionado}", f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."))
+            render_kpi_card(titulo_anual, f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."), modo_card)
+
 
     st.markdown("  ", unsafe_allow_html=True)
     # ============================================================
