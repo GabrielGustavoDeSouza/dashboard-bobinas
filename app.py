@@ -728,18 +728,42 @@ def normalizar_unidade(valor):
     """Evita erro no Plotly quando unidade vem vazia/NaN."""
     if pd.isna(valor):
         return "Desconhecida"
-    txt = str(valor).strip()
+    txt = str(valor).replace("\n", " ").strip()
+    txt = " ".join(txt.split())
     if not txt or txt.lower() in ["nan", "none"]:
         return "Desconhecida"
     return txt
 
 
-def is_validado_sim(valor):
-    """Retorna True quando a coluna Validado (USINA/CUSTOS) estiver marcada como SIM."""
+def normalizar_texto(valor):
+    """Normaliza textos de colunas e células para buscas robustas."""
+    import unicodedata
     if pd.isna(valor):
+        return ""
+    txt = str(valor).replace("\n", " ").replace("\xa0", " ").strip().lower()
+    txt = " ".join(txt.split())
+    txt = unicodedata.normalize("NFKD", txt).encode("ASCII", "ignore").decode("ASCII")
+    return txt
+
+
+def encontrar_coluna(df_base, termos_obrigatorios, termos_excluir=None):
+    """Encontra a primeira coluna que contenha todos os termos obrigatórios."""
+    termos_excluir = termos_excluir or []
+    for col in df_base.columns:
+        col_norm = normalizar_texto(col)
+        if all(t in col_norm for t in termos_obrigatorios) and not any(t in col_norm for t in termos_excluir):
+            return col
+    return None
+
+
+def is_validado_sim(valor):
+    """Retorna True quando a coluna Validado (USINA/CUSTOS) estiver marcada como SIM.
+    Aceita variações comuns para evitar falha futura: SIM, Sim, sim, S, X, OK, 1, True.
+    """
+    txt = normalizar_texto(valor).replace(".", "").replace(";", "").replace(":", "")
+    if not txt or txt in ["nan", "none", "nao", "no", "false", "0", "-"]:
         return False
-    txt = str(valor).strip().upper()
-    return txt in ["SIM", "S", "YES", "Y", "1", "TRUE", "VERDADEIRO"]
+    return txt in ["sim", "s", "yes", "y", "1", "true", "verdadeiro", "ok", "x", "validado", "aprovado"]
 
 
 def render_kpi_card(titulo, valor, modo="previsto"):
@@ -788,88 +812,108 @@ def render_kpi_card(titulo, valor, modo="previsto"):
     )
 
 
-def calcular_ganho_acumulado_ano(df_base, selected_unidade, ano_alvo, somente_validado=False):
-    """Calcula ganho acumulado no ano escolhido considerando 12 meses a partir do Primeiro Ganho Previsto."""
-    ganho_acumulado_ano = 0.0
+def preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=False):
+    """Prepara a base para cálculos de ganho previsto/validado.
+    Centraliza a lógica para evitar erros quando surgirem novos SIMs em novas unidades.
+    """
+    col_prev = encontrar_coluna(df_base, ["primeiro", "ganho"])
+    col_ganho_m = encontrar_coluna(df_base, ["ganho", "mensal"], termos_excluir=["primeiro"])
+    col_unid = encontrar_coluna(df_base, ["unidade", "delga"])
+    col_validado = encontrar_coluna(df_base, ["validado"])
 
-    ganho_prev_col = [c for c in df_base.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
-    ganho_mensal_col = [c for c in df_base.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
-    unidade_col_tl = [c for c in df_base.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
-    validado_col = [c for c in df_base.columns if 'validado' in str(c).lower()]
+    if not (col_ganho_m and col_unid):
+        return pd.DataFrame(), col_prev, col_ganho_m, col_unid, col_validado
 
-    if not (ganho_prev_col and ganho_mensal_col and unidade_col_tl):
-        return 0.0
+    cols = [col_unid, col_ganho_m]
+    if col_prev:
+        cols.append(col_prev)
+    if col_validado:
+        cols.append(col_validado)
 
-    df_calc = df_base.copy()
-    df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
+    df_calc = df_base[cols].copy()
+    df_calc["_unidade_norm"] = df_calc[col_unid].apply(normalizar_unidade)
 
     if selected_unidade != "Todas":
-        df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
+        selected_norm = normalizar_unidade(selected_unidade)
+        df_calc = df_calc[df_calc["_unidade_norm"] == selected_norm]
 
     if somente_validado:
-        if validado_col:
-            df_calc = df_calc[df_calc[validado_col[0]].apply(is_validado_sim)]
-        else:
-            return 0.0
+        if not col_validado:
+            return pd.DataFrame(), col_prev, col_ganho_m, col_unid, col_validado
+        df_calc = df_calc[df_calc[col_validado].apply(is_validado_sim)]
 
-    col_prev = ganho_prev_col[0]
-    col_ganho_m = ganho_mensal_col[0]
+    df_calc["ganho_num"] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
+    df_calc = df_calc[df_calc["ganho_num"] > 0].copy()
 
-    df_calc['ganho_num'] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
-    df_calc = df_calc[df_calc['ganho_num'] > 0]
+    return df_calc, col_prev, col_ganho_m, col_unid, col_validado
 
+
+def parse_mes_ano_robusto(val):
+    """Converte múltiplos formatos de mês/ano para Timestamp no primeiro dia do mês."""
     meses_map = {
         'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
         'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12,
-        'janeiro':1, 'fevereiro':2, 'março':3, 'marco':3, 'abril':4,
+        'janeiro':1, 'fevereiro':2, 'marco':3, 'março':3, 'abril':4,
         'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9,
         'outubro':10, 'novembro':11, 'dezembro':12
     }
+    try:
+        if pd.isna(val):
+            return None
+        if isinstance(val, pd.Timestamp):
+            return val.replace(day=1)
+        import datetime
+        if isinstance(val, datetime.datetime):
+            return pd.Timestamp(val).replace(day=1)
 
-    def parse_mes_ano_simples(val):
+        val_str = str(val).strip().lower()
+        if not val_str or val_str in ["nan", "none", "0", "-"]:
+            return None
+
         try:
-            if isinstance(val, (pd.Timestamp,)):
-                return val.replace(day=1)
-            import datetime
-            if isinstance(val, datetime.datetime):
-                return pd.Timestamp(val).replace(day=1)
-
-            val_str = str(val).strip().lower()
-            try:
-                parsed = pd.to_datetime(val_str)
-                if pd.notna(parsed):
-                    return parsed.replace(day=1)
-            except:
-                pass
-
-            for sep in [',', ' ']:
-                if sep in val_str:
-                    parts = [p.strip() for p in val_str.split(sep) if p.strip()]
-                    if len(parts) == 2:
-                        mes = meses_map.get(parts[0].lower())
-                        if mes:
-                            ano = int(parts[1])
-                            if ano < 100:
-                                ano += 2000
-                            return pd.Timestamp(year=ano, month=mes, day=1)
-
-            for sep in ['/', '-']:
-                if sep in val_str:
-                    parts = val_str.split(sep)
-                    if len(parts) == 2:
-                        mes = meses_map.get(parts[0].strip()[:3])
-                        if mes:
-                            ano = int(parts[1].strip())
-                            if ano < 100:
-                                ano += 2000
-                            return pd.Timestamp(year=ano, month=mes, day=1)
-        except:
+            parsed = pd.to_datetime(val_str, dayfirst=True)
+            if pd.notna(parsed):
+                return parsed.replace(day=1)
+        except Exception:
             pass
-        return None
 
-    df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_simples)
-    df_calc = df_calc[df_calc['data_inicio'].notna()]
+        val_norm = normalizar_texto(val_str)
+        for sep in [',', ' ']:
+            if sep in val_norm:
+                parts = [p.strip() for p in val_norm.split(sep) if p.strip()]
+                if len(parts) == 2:
+                    mes = meses_map.get(parts[0]) or meses_map.get(parts[0][:3])
+                    if mes:
+                        ano = int(parts[1])
+                        if ano < 100:
+                            ano += 2000
+                        return pd.Timestamp(year=ano, month=mes, day=1)
 
+        for sep in ['/', '-']:
+            if sep in val_norm:
+                parts = [p.strip() for p in val_norm.split(sep) if p.strip()]
+                if len(parts) == 2:
+                    mes = meses_map.get(parts[0]) or meses_map.get(parts[0][:3])
+                    if mes:
+                        ano = int(parts[1])
+                        if ano < 100:
+                            ano += 2000
+                        return pd.Timestamp(year=ano, month=mes, day=1)
+    except Exception:
+        pass
+    return None
+
+
+def calcular_ganho_acumulado_ano(df_base, selected_unidade, ano_alvo, somente_validado=False):
+    """Calcula ganho acumulado no ano escolhido considerando 12 meses a partir do Primeiro Ganho Previsto."""
+    df_calc, col_prev, _, _, _ = preparar_df_ganhos(df_base, selected_unidade, somente_validado)
+    if df_calc.empty or not col_prev:
+        return 0.0
+
+    df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_robusto)
+    df_calc = df_calc[df_calc['data_inicio'].notna()].copy()
+
+    ganho_acumulado_ano = 0.0
     for _, row in df_calc.iterrows():
         inicio = row['data_inicio']
         ganho = row['ganho_num']
@@ -885,22 +929,9 @@ def calcular_ganho_acumulado_ano(df_base, selected_unidade, ano_alvo, somente_va
 
 def calcular_ganho_mensal_validado(df_base, selected_unidade):
     """Soma o ganho mensal apenas das bobinas marcadas como SIM na coluna Validado."""
-    ganho_mensal_col = [c for c in df_base.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
-    unidade_col_tl = [c for c in df_base.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
-    validado_col = [c for c in df_base.columns if 'validado' in str(c).lower()]
-
-    if not (ganho_mensal_col and unidade_col_tl and validado_col):
+    df_calc, _, _, _, _ = preparar_df_ganhos(df_base, selected_unidade, somente_validado=True)
+    if df_calc.empty:
         return 0.0
-
-    df_calc = df_base.copy()
-    df_calc[unidade_col_tl[0]] = df_calc[unidade_col_tl[0]].apply(normalizar_unidade)
-
-    if selected_unidade != "Todas":
-        df_calc = df_calc[df_calc[unidade_col_tl[0]] == selected_unidade]
-
-    df_calc = df_calc[df_calc[validado_col[0]].apply(is_validado_sim)]
-    df_calc['ganho_num'] = df_calc[ganho_mensal_col[0]].apply(parse_numero_brasileiro)
-
     return float(df_calc['ganho_num'].sum())
 
 
@@ -1085,6 +1116,14 @@ def main():
         with col_sel3:
             st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
             modo_validado = st.toggle("✅ Validado", value=False, key="toggle_validado")
+
+        # Diagnóstico discreto para evitar dúvida quando novos SIMs forem adicionados
+        qtd_validados_geral = 0
+        col_validado_diag = encontrar_coluna(df, ["validado"])
+        if col_validado_diag:
+            qtd_validados_geral = int(df[col_validado_diag].apply(is_validado_sim).sum())
+        if modo_validado:
+            st.caption(f"Modo Validado ativo: {qtd_validados_geral} bobina(s) marcada(s) como SIM na base atual.")
 
         if selected_unidade == "Todas":
             u_bobinas = total_bobinas
