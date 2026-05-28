@@ -672,6 +672,39 @@ def create_ganho_pie_chart(df_unidades):
     return fig
 
 
+
+
+def create_ganho_validado_pie_chart(df_base):
+    """Gráfico de rosca do ganho financeiro validado por unidade.
+    Usa a mesma lógica robusta dos KPIs: só considera linhas marcadas como SIM/OK/X/etc.
+    """
+    df_v, _, _, col_unid, _ = preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=True)
+    if df_v.empty or not col_unid:
+        return None
+
+    dist = df_v.groupby("_unidade_norm")["ganho_num"].sum().sort_values(ascending=False)
+    dist = dist[dist > 0]
+    if len(dist) == 0:
+        return None
+
+    colors = get_unidade_colors_list(dist.index)
+    fig = go.Figure(data=[go.Pie(
+        labels=[str(x) for x in dist.index],
+        values=dist.values.tolist(),
+        hole=0.45,
+        marker=dict(colors=colors),
+        textinfo='percent+label',
+        textfont=dict(size=12, color="#ECEFF1"),
+        hovertemplate='%{label} <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',
+    )])
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Ganho Financeiro por Unidade (Validado)", font=dict(size=16, color=COLORS["emerald"])),
+        height=400,
+    )
+    return fig
+
+
 def create_ganho_usinas_chart(df_usinas):
     """Gráfico de ganho financeiro por usina."""
     if len(df_usinas) == 0:
@@ -1251,9 +1284,19 @@ def main():
             if has_ganho:
                 col_i, col_j = st.columns(2)
                 with col_i:
-                    render_chart(create_ganho_pie_chart(df_unidades))
+                    fig_previsto = create_ganho_pie_chart(df_unidades)
+                    if fig_previsto:
+                        fig_previsto.update_layout(
+                            title=dict(
+                                text="Ganho Financeiro por Unidade (Previsto)",
+                                font=dict(size=16, color=COLORS["cyan"])
+                            )
+                        )
+                    render_chart(fig_previsto)
                 with col_j:
-                    render_chart(create_ganho_unidade_chart(df_unidades))
+                    fig_validado = create_ganho_validado_pie_chart(df)
+                    if not render_chart(fig_validado):
+                        st.info("Nenhum ganho validado encontrado ainda.")
 
                 if len(df_usinas) > 0 and df_usinas['ganho'].sum() > 0:
                     st.markdown("### Ganho Financeiro por Usina")
