@@ -1265,12 +1265,24 @@ def main():
                 st.info("Sem dados de progresso.")
 
             st.markdown("### Progresso de Análise por Unidade")
-            df_display = df_unidades.copy()
-            df_display.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
+
+            # Montagem robusta da tabela: evita erro quando novas colunas forem
+            # adicionadas na aba Formulas, como Ganho Validado na coluna H.
+            cols_display = ['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']
+            if 'ganho_validado' in df_unidades.columns:
+                cols_display.append('ganho_validado')
+
+            df_display = df_unidades[cols_display].copy()
+            df_display.columns = (
+                ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho Previsto (R$)']
+                + (['Ganho Validado (R$)'] if 'ganho_validado' in cols_display else [])
+            )
             df_display['Peso Total (ton)'] = df_display['Peso Total (ton)'].round(1)
             df_display['Peso Analisado (ton)'] = df_display['Peso Analisado (ton)'].round(1)
             df_display['% Concluído'] = df_display['% Concluído'].apply(lambda x: f"{x:.1f}%")
-            df_display['Ganho (R$)'] = df_display['Ganho (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
+            df_display['Ganho Previsto (R$)'] = df_display['Ganho Previsto (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
+            if 'Ganho Validado (R$)' in df_display.columns:
+                df_display['Ganho Validado (R$)'] = df_display['Ganho Validado (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
         else:
             st.info("Dados de análise não encontrados na aba Formulas.")
