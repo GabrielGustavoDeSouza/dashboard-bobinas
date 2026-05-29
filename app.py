@@ -332,9 +332,16 @@ def parse_formulas(df_formulas):
             ganho = float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0
         except (ValueError, TypeError):
             ganho = 0
+        try:
+            # Coluna H da aba Formulas: Ganho Validado
+            # Mantida como fonte oficial do KPI/rosca validada quando existir.
+            ganho_validado = parse_numero_brasileiro(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 0
+        except (ValueError, TypeError, IndexError):
+            ganho_validado = 0
         unidades.append({
             'unidade': nome, 'bobinas': bobinas, 'peso_total': peso_total,
             'peso_analisado': peso_analisado, 'pct': pct, 'ganho': ganho,
+            'ganho_validado': ganho_validado,
         })
 
     usina_start = None
@@ -674,16 +681,31 @@ def create_ganho_pie_chart(df_unidades):
 
 
 
-def create_ganho_validado_pie_chart(df_base):
-    """Gráfico de rosca do ganho financeiro validado por unidade.
-    Usa a mesma lógica robusta dos KPIs: só considera linhas marcadas como SIM/OK/X/etc.
-    """
-    df_v, _, _, col_unid, _ = preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=True)
-    if df_v.empty or not col_unid:
-        return None
 
-    dist = df_v.groupby("_unidade_norm")["ganho_num"].sum().sort_values(ascending=False)
-    dist = dist[dist > 0]
+def create_ganho_validado_pie_chart(df_base, df_unidades=None):
+    """Gráfico de rosca do ganho financeiro validado por unidade.
+    Prioridade:
+    1) usa a coluna 'Ganho Validado' da aba Formulas, quando disponível;
+    2) se a coluna não existir ou estiver zerada, calcula direto da aba Controle
+       com base na coluna Validado (USINA/CUSTOS).
+    """
+    dist = pd.Series(dtype="float64")
+
+    if df_unidades is not None and len(df_unidades) > 0 and "ganho_validado" in df_unidades.columns:
+        df_g = df_unidades.copy()
+        df_g["ganho_validado"] = df_g["ganho_validado"].apply(parse_numero_brasileiro)
+        df_g = df_g[df_g["ganho_validado"] > 0]
+        if len(df_g) > 0:
+            dist = df_g.groupby("unidade")["ganho_validado"].sum().sort_values(ascending=False)
+
+    # Fallback robusto: calcula direto na base Controle quando a aba Formulas ainda não trouxe valor.
+    if dist.empty:
+        df_v, _, _, col_unid, _ = preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=True)
+        if df_v.empty or not col_unid:
+            return None
+        dist = df_v.groupby("_unidade_norm")["ganho_num"].sum().sort_values(ascending=False)
+        dist = dist[dist > 0]
+
     if len(dist) == 0:
         return None
 
@@ -703,7 +725,6 @@ def create_ganho_validado_pie_chart(df_base):
         height=400,
     )
     return fig
-
 
 def create_ganho_usinas_chart(df_usinas):
     """Gráfico de ganho financeiro por usina."""
@@ -1115,6 +1136,7 @@ def main():
     total_peso = float(df_unidades['peso_total'].sum()) if len(df_unidades) > 0 else 0
     total_peso_analisado = float(df_unidades['peso_analisado'].sum()) if len(df_unidades) > 0 else 0
     total_ganho = float(df_unidades['ganho'].sum()) if len(df_unidades) > 0 else 0
+    total_ganho_validado = float(df_unidades['ganho_validado'].sum()) if len(df_unidades) > 0 and 'ganho_validado' in df_unidades.columns else calcular_ganho_mensal_validado(df, "Todas")
 
     total_pct_geral = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
 
@@ -1163,6 +1185,7 @@ def main():
             u_peso = total_peso
             u_analisado = total_peso_analisado
             u_ganho_previsto = total_ganho
+            u_ganho_validado_formulas = total_ganho_validado
             u_pct = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
         else:
             row_u = df_unidades[df_unidades['unidade'] == selected_unidade].iloc[0]
@@ -1170,12 +1193,13 @@ def main():
             u_peso = float(row_u['peso_total'])
             u_analisado = float(row_u['peso_analisado'])
             u_ganho_previsto = float(row_u['ganho'])
+            u_ganho_validado_formulas = float(row_u['ganho_validado']) if 'ganho_validado' in row_u.index and pd.notna(row_u['ganho_validado']) else calcular_ganho_mensal_validado(df, selected_unidade)
             u_pct = float(row_u['pct'])
 
         if modo_validado:
             titulo_mensal = "Ganho Mensal (Validado)"
             titulo_anual = f"Ganho Acumulado em {ano_selecionado} (Validado)"
-            u_ganho_exibido = calcular_ganho_mensal_validado(df, selected_unidade)
+            u_ganho_exibido = u_ganho_validado_formulas
             ganho_acumulado_ano = calcular_ganho_acumulado_ano(
                 df, selected_unidade, int(ano_selecionado), somente_validado=True
             )
@@ -1294,7 +1318,7 @@ def main():
                         )
                     render_chart(fig_previsto)
                 with col_j:
-                    fig_validado = create_ganho_validado_pie_chart(df)
+                    fig_validado = create_ganho_validado_pie_chart(df, df_unidades)
                     if not render_chart(fig_validado):
                         st.info("Nenhum ganho validado encontrado ainda.")
 
@@ -1308,12 +1332,17 @@ def main():
                 )
 
             st.markdown("### Resumo Financeiro por Unidade")
-            df_fin = df_unidades[['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']].copy()
-            df_fin.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho (R$)']
+            cols_fin = ['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']
+            if 'ganho_validado' in df_unidades.columns:
+                cols_fin.append('ganho_validado')
+            df_fin = df_unidades[cols_fin].copy()
+            df_fin.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho Previsto (R$)'] + (['Ganho Validado (R$)'] if 'ganho_validado' in df_unidades.columns else [])
             df_fin['Peso Total (ton)'] = df_fin['Peso Total (ton)'].round(1)
             df_fin['Peso Analisado (ton)'] = df_fin['Peso Analisado (ton)'].round(1)
             df_fin['% Concluído'] = df_fin['% Concluído'].apply(lambda x: f"{x:.1f}%")
-            df_fin['Ganho (R$)'] = df_fin['Ganho (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
+            df_fin['Ganho Previsto (R$)'] = df_fin['Ganho Previsto (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
+            if 'Ganho Validado (R$)' in df_fin.columns:
+                df_fin['Ganho Validado (R$)'] = df_fin['Ganho Validado (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
             st.dataframe(df_fin, use_container_width=True, hide_index=True)
         else:
             st.info("Dados financeiros não encontrados na aba Formulas.")
