@@ -113,7 +113,6 @@ ADMIN_PASSWORD = "M@ster"
 
 
 def get_github_token():
-    """Obtém o token do GitHub dos secrets do Streamlit."""
     try:
         return st.secrets["GITHUB_TOKEN"]
     except (KeyError, FileNotFoundError):
@@ -121,7 +120,6 @@ def get_github_token():
 
 
 def get_unidade_color(nome):
-    """Retorna a cor padronizada da unidade Delga."""
     for key, color in UNIDADE_COLORS.items():
         if key.lower() in str(nome).lower():
             return color
@@ -129,7 +127,6 @@ def get_unidade_color(nome):
 
 
 def get_unidade_colors_list(names):
-    """Retorna lista de cores para uma lista de nomes de unidades."""
     return [get_unidade_color(n) for n in names]
 
 
@@ -138,7 +135,6 @@ def get_unidade_colors_list(names):
 # ============================================================
 @st.cache_data(ttl=120)
 def load_data_from_github():
-    """Carrega o arquivo Excel salvo no repositório GitHub."""
     token = get_github_token()
     if not token:
         return None, None
@@ -150,7 +146,7 @@ def load_data_from_github():
     }
     params = {"ref": GITHUB_BRANCH}
 
-    response = requests.get(url, headers=headers, params=params )
+    response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
         content = response.json()
         file_content = base64.b64decode(content["content"])
@@ -163,7 +159,6 @@ def load_data_from_github():
 
 
 def save_data_to_github(file_bytes, filename):
-    """Salva o arquivo Excel no repositório GitHub (cria ou atualiza)."""
     token = get_github_token()
     if not token:
         return False, "Token do GitHub não configurado nos Secrets."
@@ -174,16 +169,13 @@ def save_data_to_github(file_bytes, filename):
         "Accept": "application/vnd.github.v3+json",
     }
 
-    # Verificar se o arquivo já existe (para obter o SHA )
     response = requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH})
     sha = None
     if response.status_code == 200:
         sha = response.json()["sha"]
 
-    # Codificar o arquivo em base64
     content_b64 = base64.b64encode(file_bytes).decode("utf-8")
 
-    # Montar o payload
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     payload = {
         "message": f"Atualização de dados: {filename} ({now})",
@@ -193,10 +185,8 @@ def save_data_to_github(file_bytes, filename):
     if sha:
         payload["sha"] = sha
 
-    # Enviar
     response = requests.put(url, headers=headers, json=payload)
     if response.status_code in [200, 201]:
-        # Limpar o cache para que os novos dados sejam carregados
         load_data_from_github.clear()
         return True, "Dados atualizados com sucesso!"
     else:
@@ -218,7 +208,7 @@ def get_access_token():
         "client_secret": client_secret,
         "scope": "https://graph.microsoft.com/.default",
     }
-    response = requests.post(url, data=data )
+    response = requests.post(url, data=data)
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -231,11 +221,11 @@ def load_data_from_sharepoint():
     site_path = st.secrets["SHAREPOINT_SITE_PATH"]
     file_path = st.secrets["SHAREPOINT_FILE_PATH"]
     site_url = f"https://graph.microsoft.com/v1.0/sites/{site_domain}:/sites/{site_path}"
-    site_resp = requests.get(site_url, headers=headers )
+    site_resp = requests.get(site_url, headers=headers)
     site_resp.raise_for_status()
     site_id = site_resp.json()["id"]
     file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_path}:/content"
-    file_resp = requests.get(file_url, headers=headers )
+    file_resp = requests.get(file_url, headers=headers)
     file_resp.raise_for_status()
     excel_bytes = io.BytesIO(file_resp.content)
     df_controle = smart_read_excel(excel_bytes, "Controle")
@@ -245,7 +235,6 @@ def load_data_from_sharepoint():
 
 
 def smart_read_excel(excel_bytes, sheet_name):
-    """Lê uma aba do Excel detectando automaticamente a linha do cabeçalho."""
     df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=0)
     unnamed_count = sum(1 for c in df.columns if str(c).startswith('Unnamed'))
     if unnamed_count > len(df.columns) * 0.5:
@@ -269,7 +258,6 @@ def load_data_from_upload(uploaded_file):
 
 
 def process_data(df_raw):
-    """Processa e limpa os dados do controle."""
     df = df_raw.copy()
     df.columns = [str(c).replace('\n', ' ').strip() for c in df.columns]
 
@@ -295,8 +283,9 @@ def process_data(df_raw):
         df[col] = df[col].apply(parse_numero_brasileiro)
 
     return df, col_names
+
+
 def parse_formulas(df_formulas):
-    """Extrai dados estruturados da aba Formulas."""
     unidades = []
     usinas = []
 
@@ -328,20 +317,9 @@ def parse_formulas(df_formulas):
                 pct = 0
         except (ValueError, TypeError):
             pct = 0
-        try:
-            ganho = float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0
-        except (ValueError, TypeError):
-            ganho = 0
-        try:
-            # Coluna H da aba Formulas: Ganho Validado
-            # Mantida como fonte oficial do KPI/rosca validada quando existir.
-            ganho_validado = parse_numero_brasileiro(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 0
-        except (ValueError, TypeError, IndexError):
-            ganho_validado = 0
         unidades.append({
             'unidade': nome, 'bobinas': bobinas, 'peso_total': peso_total,
-            'peso_analisado': peso_analisado, 'pct': pct, 'ganho': ganho,
-            'ganho_validado': ganho_validado,
+            'peso_analisado': peso_analisado, 'pct': pct,
         })
 
     usina_start = None
@@ -372,14 +350,9 @@ def parse_formulas(df_formulas):
                 pct_repr = float(row.iloc[3]) if pd.notna(row.iloc[3]) else 0
             except (ValueError, TypeError):
                 pct_repr = 0
-            try:
-                ganho_usina = float(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
-            except (ValueError, TypeError):
-                ganho_usina = 0
             usinas.append({
                 'usina': nome, 'bobinas': bobinas, 'peso': peso,
                 'pct_representacao': pct_repr * 100 if pct_repr <= 1 else pct_repr,
-                'ganho': ganho_usina,
             })
 
     df_unidades = pd.DataFrame(unidades) if unidades else pd.DataFrame()
@@ -391,7 +364,6 @@ def parse_formulas(df_formulas):
 # FUNÇÕES DE GRÁFICOS
 # ============================================================
 def create_area_chart(df, col_names):
-    """Gráfico de evolução mensal."""
     meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai']
     keys = ['jan', 'fev', 'mar', 'abr', 'mai']
     valores = []
@@ -422,7 +394,6 @@ def create_area_chart(df, col_names):
 
 
 def create_unidade_pie_chart(df, col_media):
-    """Gráfico de pizza por Unidade Delga com cores padronizadas."""
     unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
     if not unidade_col:
         return None
@@ -449,34 +420,25 @@ def create_unidade_pie_chart(df, col_media):
 
 
 def create_tipo_pie_chart(df, col_media):
-    """Gráfico de pizza por Tipo de bobina (Agrupado por terminação)."""
     tipo_col = [c for c in df.columns if c.strip() == 'Tipo']
     if not tipo_col:
         return None
     df_valid = df[df[tipo_col[0]].notna() & (df[tipo_col[0]].astype(str).str.strip() != '')].copy()
     if len(df_valid) == 0:
         return None
-        
-    # --- NOVA LÓGICA DE AGRUPAMENTO ---
+
     def agrupar_tipo(tipo):
         t = str(tipo).strip().upper()
         if t.endswith('Z'): return 'BZ'
         if t.endswith('Q'): return 'BQ'
         if t.endswith('F'): return 'BF'
         return 'Outros'
-        
-    # Aplica a regra e cria uma nova coluna temporária
+
     df_valid['Tipo_Agrupado'] = df_valid[tipo_col[0]].apply(agrupar_tipo)
-    
-    # Remove qualquer coisa que não seja Z, Q ou F (para garantir apenas as 3 fatias)
     df_valid = df_valid[df_valid['Tipo_Agrupado'] != 'Outros']
-    
-    # Agrupa os valores somando a necessidade média
     dist = df_valid.groupby('Tipo_Agrupado')[col_media].sum().sort_values(ascending=False)
-    
-    # Define cores fixas para manter o padrão visual (Azul, Amarelo, Verde)
     cores_fatias = ["#4DA3FF", "#FFB800", "#00E676"]
-    
+
     fig = go.Figure(data=[go.Pie(
         labels=[str(x) for x in dist.index],
         values=dist.values.tolist(),
@@ -484,7 +446,8 @@ def create_tipo_pie_chart(df, col_media):
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
         textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label}<b>%{value:,.1f} ton</b> %{percent}<extra></extra>',    )])
+        hovertemplate='%{label}<b>%{value:,.1f} ton</b> %{percent}<extra></extra>',
+    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Tipo de Bobina", font=dict(size=16, color=COLORS["cyan"])),
@@ -494,7 +457,6 @@ def create_tipo_pie_chart(df, col_media):
 
 
 def create_thickness_chart(df, col_media):
-    """Gráfico de distribuição por faixa de espessura."""
     esp_col = [c for c in df.columns if 'Esp' in c and 'mm' in c]
     if not esp_col:
         return None
@@ -527,7 +489,6 @@ def create_thickness_chart(df, col_media):
 
 
 def create_progress_chart(df_unidades):
-    """Gráfico de progresso de análise por unidade com cores padronizadas."""
     if len(df_unidades) == 0:
         return None
     unidades = df_unidades['unidade'].tolist()
@@ -560,7 +521,6 @@ def create_progress_chart(df_unidades):
 
 
 def create_usinas_chart(df_usinas, top_n=15):
-    """Gráfico de barras das usinas."""
     if len(df_usinas) == 0:
         return None
     df_sorted = df_usinas.nlargest(top_n, 'peso')
@@ -570,7 +530,8 @@ def create_usinas_chart(df_usinas, top_n=15):
         y=df_sorted['usina'].tolist(),
         orientation='h',
         marker=dict(color=COLORS["teal"]),
-        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
+    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Top Usinas por Peso (ton)", font=dict(size=16, color=COLORS["cyan"])),
@@ -582,7 +543,6 @@ def create_usinas_chart(df_usinas, top_n=15):
 
 
 def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
-    """Gráfico de barras horizontal genérico."""
     df_valid = df[df[group_col].notna() & (df[group_col].astype(str).str.strip() != '')].copy()
     if len(df_valid) == 0:
         return None
@@ -592,7 +552,8 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=color or COLORS["cyan"]),
-        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',    )])
+        hovertemplate='%{y}  <b>%{x:,.1f} ton</b><extra></extra>',
+    )])
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
@@ -601,8 +562,9 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
     )
     return fig
+
+
 def create_unidade_bar_chart(df, col_media):
-    """Gráfico de barras por unidade Delga com cores padronizadas."""
     unidade_col = [c for c in df.columns if 'Unidade' in c and 'Delga' in c]
     if not unidade_col:
         return None
@@ -628,132 +590,7 @@ def create_unidade_bar_chart(df, col_media):
     return fig
 
 
-def create_ganho_unidade_chart(df_unidades):
-    """Gráfico de ganho financeiro por unidade com cores padronizadas."""
-    if len(df_unidades) == 0:
-        return None
-    df_g = df_unidades[df_unidades['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    df_g = df_g.sort_values('ganho', ascending=True)
-    colors = get_unidade_colors_list(df_g['unidade'])
-    fig = go.Figure(data=[go.Bar(
-        x=df_g['ganho'].tolist(),
-        y=df_g['unidade'].tolist(),
-        orientation='h',
-        marker=dict(color=colors),
-        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho Financeiro por Unidade (R$)", font=dict(size=16, color=COLORS["cyan"])),
-        xaxis=dict(title="R$", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        height=350,
-    )
-    return fig
-
-
-def create_ganho_pie_chart(df_unidades):
-    """Gráfico de pizza do ganho financeiro por unidade."""
-    if len(df_unidades) == 0:
-        return None
-    df_g = df_unidades[df_unidades['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    colors = get_unidade_colors_list(df_g['unidade'])
-    fig = go.Figure(data=[go.Pie(
-        labels=df_g['unidade'].tolist(),
-        values=df_g['ganho'].tolist(),
-        hole=0.45,
-        marker=dict(colors=colors),
-        textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label} <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho Financeiro por Unidade", font=dict(size=16, color=COLORS["cyan"])),
-        height=400,
-    )
-    return fig
-
-
-
-
-
-def create_ganho_validado_pie_chart(df_base, df_unidades=None):
-    """Gráfico de rosca do ganho financeiro validado por unidade.
-    Prioridade:
-    1) usa a coluna 'Ganho Validado' da aba Formulas, quando disponível;
-    2) se a coluna não existir ou estiver zerada, calcula direto da aba Controle
-       com base na coluna Validado (USINA/CUSTOS).
-    """
-    dist = pd.Series(dtype="float64")
-
-    if df_unidades is not None and len(df_unidades) > 0 and "ganho_validado" in df_unidades.columns:
-        df_g = df_unidades.copy()
-        df_g["ganho_validado"] = df_g["ganho_validado"].apply(parse_numero_brasileiro)
-        df_g = df_g[df_g["ganho_validado"] > 0]
-        if len(df_g) > 0:
-            dist = df_g.groupby("unidade")["ganho_validado"].sum().sort_values(ascending=False)
-
-    # Fallback robusto: calcula direto na base Controle quando a aba Formulas ainda não trouxe valor.
-    if dist.empty:
-        df_v, _, _, col_unid, _ = preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=True)
-        if df_v.empty or not col_unid:
-            return None
-        dist = df_v.groupby("_unidade_norm")["ganho_num"].sum().sort_values(ascending=False)
-        dist = dist[dist > 0]
-
-    if len(dist) == 0:
-        return None
-
-    colors = get_unidade_colors_list(dist.index)
-    fig = go.Figure(data=[go.Pie(
-        labels=[str(x) for x in dist.index],
-        values=dist.values.tolist(),
-        hole=0.45,
-        marker=dict(colors=colors),
-        textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
-        hovertemplate='%{label} <b>R$ %{value:,.0f}</b>  %{percent}<extra></extra>',
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho Financeiro por Unidade (Validado)", font=dict(size=16, color=COLORS["emerald"])),
-        height=400,
-    )
-    return fig
-
-def create_ganho_usinas_chart(df_usinas):
-    """Gráfico de ganho financeiro por usina."""
-    if len(df_usinas) == 0:
-        return None
-    df_g = df_usinas[df_usinas['ganho'] > 0].copy()
-    if len(df_g) == 0:
-        return None
-    df_g = df_g.sort_values('ganho', ascending=True)
-    fig = go.Figure(data=[go.Bar(
-        x=df_g['ganho'].tolist(),
-        y=df_g['usina'].tolist(),
-        orientation='h',
-        marker=dict(color=COLORS["emerald"]),
-        hovertemplate='%{y}  <b>R$ %{x:,.0f}</b><extra></extra>',
-    )])
-    fig.update_layout(
-        **PLOTLY_LAYOUT,
-        title=dict(text="Ganho por Usina (R$)", font=dict(size=16, color=COLORS["cyan"])),
-        xaxis=dict(title="R$", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        height=max(400, len(df_g) * 30),
-    )
-    return fig
-
-
-
 def parse_numero_brasileiro(valor):
-    """Converte número, moeda ou texto BR/US para float com segurança."""
     if pd.isna(valor):
         return 0.0
     if isinstance(valor, (int, float)):
@@ -763,8 +600,7 @@ def parse_numero_brasileiro(valor):
         return 0.0
     txt = (txt.replace("R$", "")
               .replace(" ", "")
-              .replace(" ", ""))
-    # BR: 1.234,56 | US: 1,234.56 | simples: 1234,56
+              .replace("\xa0", ""))
     if "," in txt and "." in txt:
         if txt.rfind(",") > txt.rfind("."):
             txt = txt.replace(".", "").replace(",", ".")
@@ -779,7 +615,6 @@ def parse_numero_brasileiro(valor):
 
 
 def normalizar_unidade(valor):
-    """Evita erro no Plotly quando unidade vem vazia/NaN."""
     if pd.isna(valor):
         return "Desconhecida"
     txt = str(valor).replace("\n", " ").strip()
@@ -789,211 +624,7 @@ def normalizar_unidade(valor):
     return txt
 
 
-def normalizar_texto(valor):
-    """Normaliza textos de colunas e células para buscas robustas."""
-    import unicodedata
-    if pd.isna(valor):
-        return ""
-    txt = str(valor).replace("\n", " ").replace("\xa0", " ").strip().lower()
-    txt = " ".join(txt.split())
-    txt = unicodedata.normalize("NFKD", txt).encode("ASCII", "ignore").decode("ASCII")
-    return txt
-
-
-def encontrar_coluna(df_base, termos_obrigatorios, termos_excluir=None):
-    """Encontra a primeira coluna que contenha todos os termos obrigatórios."""
-    termos_excluir = termos_excluir or []
-    for col in df_base.columns:
-        col_norm = normalizar_texto(col)
-        if all(t in col_norm for t in termos_obrigatorios) and not any(t in col_norm for t in termos_excluir):
-            return col
-    return None
-
-
-def is_validado_sim(valor):
-    """Retorna True quando a coluna Validado (USINA/CUSTOS) estiver marcada como SIM.
-    Aceita variações comuns para evitar falha futura: SIM, Sim, sim, S, X, OK, 1, True.
-    """
-    txt = normalizar_texto(valor).replace(".", "").replace(";", "").replace(":", "")
-    if not txt or txt in ["nan", "none", "nao", "no", "false", "0", "-"]:
-        return False
-    return txt in ["sim", "s", "yes", "y", "1", "true", "verdadeiro", "ok", "x", "validado", "aprovado"]
-
-
-def render_kpi_card(titulo, valor, modo="previsto"):
-    """Renderiza card KPI customizado. No modo validado usa tom verde."""
-    if modo == "validado":
-        bg = "linear-gradient(135deg, #0B2A1A 0%, #123D27 100%)"
-        border = "#1F7A46"
-        title_color = "#B7F7D0"
-        value_color = "#D8FFE8"
-        shadow = "0 4px 16px rgba(0,230,118,0.10)"
-    else:
-        bg = "linear-gradient(135deg, #0F1A2E 0%, #132040 100%)"
-        border = "#1A2744"
-        title_color = "#B7D7FF"
-        value_color = "#CFE4FF"
-        shadow = "0 4px 12px rgba(0,0,0,0.3)"
-
-    st.markdown(
-        f"""
-        <div style="
-            background:{bg};
-            border:1px solid {border};
-            border-radius:12px;
-            padding:20px 18px;
-            min-height:91px;
-            box-shadow:{shadow};
-        ">
-            <div style="
-                color:{title_color};
-                font-size:11px;
-                font-weight:700;
-                text-transform:uppercase;
-                letter-spacing:.6px;
-                margin-bottom:8px;
-            ">{titulo}</div>
-            <div style="
-                color:{value_color};
-                font-size:30px;
-                line-height:1.15;
-                font-weight:800;
-                font-family:Inter, Arial, sans-serif;
-            ">{valor}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def preparar_df_ganhos(df_base, selected_unidade="Todas", somente_validado=False):
-    """Prepara a base para cálculos de ganho previsto/validado.
-    Centraliza a lógica para evitar erros quando surgirem novos SIMs em novas unidades.
-    """
-    col_prev = encontrar_coluna(df_base, ["primeiro", "ganho"])
-    col_ganho_m = encontrar_coluna(df_base, ["ganho", "mensal"], termos_excluir=["primeiro"])
-    col_unid = encontrar_coluna(df_base, ["unidade", "delga"])
-    col_validado = encontrar_coluna(df_base, ["validado"])
-
-    if not (col_ganho_m and col_unid):
-        return pd.DataFrame(), col_prev, col_ganho_m, col_unid, col_validado
-
-    cols = [col_unid, col_ganho_m]
-    if col_prev:
-        cols.append(col_prev)
-    if col_validado:
-        cols.append(col_validado)
-
-    df_calc = df_base[cols].copy()
-    df_calc["_unidade_norm"] = df_calc[col_unid].apply(normalizar_unidade)
-
-    if selected_unidade != "Todas":
-        selected_norm = normalizar_unidade(selected_unidade)
-        df_calc = df_calc[df_calc["_unidade_norm"] == selected_norm]
-
-    if somente_validado:
-        if not col_validado:
-            return pd.DataFrame(), col_prev, col_ganho_m, col_unid, col_validado
-        df_calc = df_calc[df_calc[col_validado].apply(is_validado_sim)]
-
-    df_calc["ganho_num"] = df_calc[col_ganho_m].apply(parse_numero_brasileiro)
-    df_calc = df_calc[df_calc["ganho_num"] > 0].copy()
-
-    return df_calc, col_prev, col_ganho_m, col_unid, col_validado
-
-
-def parse_mes_ano_robusto(val):
-    """Converte múltiplos formatos de mês/ano para Timestamp no primeiro dia do mês."""
-    meses_map = {
-        'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
-        'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12,
-        'janeiro':1, 'fevereiro':2, 'marco':3, 'março':3, 'abril':4,
-        'maio':5, 'junho':6, 'julho':7, 'agosto':8, 'setembro':9,
-        'outubro':10, 'novembro':11, 'dezembro':12
-    }
-    try:
-        if pd.isna(val):
-            return None
-        if isinstance(val, pd.Timestamp):
-            return val.replace(day=1)
-        import datetime
-        if isinstance(val, datetime.datetime):
-            return pd.Timestamp(val).replace(day=1)
-
-        val_str = str(val).strip().lower()
-        if not val_str or val_str in ["nan", "none", "0", "-"]:
-            return None
-
-        try:
-            parsed = pd.to_datetime(val_str, dayfirst=True)
-            if pd.notna(parsed):
-                return parsed.replace(day=1)
-        except Exception:
-            pass
-
-        val_norm = normalizar_texto(val_str)
-        for sep in [',', ' ']:
-            if sep in val_norm:
-                parts = [p.strip() for p in val_norm.split(sep) if p.strip()]
-                if len(parts) == 2:
-                    mes = meses_map.get(parts[0]) or meses_map.get(parts[0][:3])
-                    if mes:
-                        ano = int(parts[1])
-                        if ano < 100:
-                            ano += 2000
-                        return pd.Timestamp(year=ano, month=mes, day=1)
-
-        for sep in ['/', '-']:
-            if sep in val_norm:
-                parts = [p.strip() for p in val_norm.split(sep) if p.strip()]
-                if len(parts) == 2:
-                    mes = meses_map.get(parts[0]) or meses_map.get(parts[0][:3])
-                    if mes:
-                        ano = int(parts[1])
-                        if ano < 100:
-                            ano += 2000
-                        return pd.Timestamp(year=ano, month=mes, day=1)
-    except Exception:
-        pass
-    return None
-
-
-def calcular_ganho_acumulado_ano(df_base, selected_unidade, ano_alvo, somente_validado=False):
-    """Calcula ganho acumulado no ano escolhido considerando 12 meses a partir do Primeiro Ganho Previsto."""
-    df_calc, col_prev, _, _, _ = preparar_df_ganhos(df_base, selected_unidade, somente_validado)
-    if df_calc.empty or not col_prev:
-        return 0.0
-
-    df_calc['data_inicio'] = df_calc[col_prev].apply(parse_mes_ano_robusto)
-    df_calc = df_calc[df_calc['data_inicio'].notna()].copy()
-
-    ganho_acumulado_ano = 0.0
-    for _, row in df_calc.iterrows():
-        inicio = row['data_inicio']
-        ganho = row['ganho_num']
-        meses_no_ano = 0
-        for m in range(12):
-            mes_atual = inicio + pd.DateOffset(months=m)
-            if mes_atual.year == int(ano_alvo):
-                meses_no_ano += 1
-        ganho_acumulado_ano += (ganho * meses_no_ano)
-
-    return float(ganho_acumulado_ano)
-
-
-def calcular_ganho_mensal_validado(df_base, selected_unidade):
-    """Soma o ganho mensal apenas das bobinas marcadas como SIM na coluna Validado."""
-    df_calc, _, _, _, _ = preparar_df_ganhos(df_base, selected_unidade, somente_validado=True)
-    if df_calc.empty:
-        return 0.0
-    return float(df_calc['ganho_num'].sum())
-
-
-# ============================================================
-# HELPER: renderizar gráfico com theme=None
-# ============================================================
 def render_chart(fig):
-    """Renderiza um gráfico Plotly no Streamlit com theme=None para evitar override de cores."""
     if fig is not None:
         st.plotly_chart(fig, use_container_width=True, theme=None)
         return True
@@ -1014,7 +645,6 @@ def main():
         <hr style="border-color:#1A2744; margin:0 0 16px 0;">
         """, unsafe_allow_html=True)
 
-        # ── ÁREA ADMIN (protegida por senha) ──
         st.markdown("#### 🔐 Área do Administrador")
         with st.expander("Atualizar Dados (requer senha)", expanded=False):
             senha = st.text_input("Senha:", type="password", key="admin_pwd")
@@ -1042,7 +672,6 @@ def main():
 
         st.markdown("---")
 
-        # Legenda de cores das unidades
         st.markdown("#### Cores por Unidade")
         for unidade, cor in UNIDADE_COLORS.items():
             st.markdown(
@@ -1056,8 +685,7 @@ def main():
         st.markdown("""
         <div style="padding:10px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border-radius:10px; border:1px solid #1A2744; margin-top:8px;">
             <p style="color:#5A7090; font-size:11px; margin:0; line-height:1.6;">
-                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.  
-
+                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
                 <b style="color:#8899B0;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
             </p>
         </div>
@@ -1082,38 +710,31 @@ def main():
     df_raw = None
     df_formulas = None
 
-    # Tentar carregar do GitHub (dados persistidos)
     try:
         df_raw, df_formulas = load_data_from_github()
     except Exception:
         df_raw, df_formulas = None, None
 
-    # Se não tem dados no GitHub, tentar SharePoint
     if df_raw is None:
         try:
             df_raw, df_formulas = load_data_from_sharepoint()
         except Exception:
             df_raw, df_formulas = None, None
 
-    # Se não tem dados de nenhuma fonte
     if df_raw is None:
         st.markdown("""
         <div style="text-align:center; padding:80px 20px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border:2px dashed #1A2744; border-radius:16px; margin:40px auto; max-width:600px;">
             <span style="font-size:64px;">📊</span>
             <h2 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
             <p style="color:#5A7090; font-size:14px;">
-                Nenhum dado disponível ainda.  
-  
-
-                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral  
-
+                Nenhum dado disponível ainda.<br><br>
+                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral
                 para enviar o arquivo Excel pela primeira vez.
             </p>
         </div>
         """, unsafe_allow_html=True)
         st.stop()
 
-    # Processar dados
     df, col_names = process_data(df_raw)
     df_unidades, df_usinas = parse_formulas(df_formulas)
 
@@ -1122,7 +743,6 @@ def main():
         st.error("Coluna de necessidade média não encontrada no arquivo.")
         st.stop()
 
-    # Timestamp
     st.markdown(f"""
     <p style="text-align:right; color:#546E7A; font-size:12px; font-family:Consolas,monospace;">
         Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M')}
@@ -1135,9 +755,6 @@ def main():
     total_bobinas = int(df_unidades['bobinas'].sum()) if len(df_unidades) > 0 else 0
     total_peso = float(df_unidades['peso_total'].sum()) if len(df_unidades) > 0 else 0
     total_peso_analisado = float(df_unidades['peso_analisado'].sum()) if len(df_unidades) > 0 else 0
-    total_ganho = float(df_unidades['ganho'].sum()) if len(df_unidades) > 0 else 0
-    total_ganho_validado = float(df_unidades['ganho_validado'].sum()) if len(df_unidades) > 0 and 'ganho_validado' in df_unidades.columns else calcular_ganho_mensal_validado(df, "Todas")
-
     total_pct_geral = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
 
     k1, k2, k3 = st.columns(3)
@@ -1149,88 +766,45 @@ def main():
         st.metric("% Concluído Geral", f"{total_pct_geral:.1f}%")
 
     # ============================================================
-    # SELETOR DE UNIDADE E FILTRO DE ANO
+    # SELETOR DE UNIDADE
     # ============================================================
     if len(df_unidades) > 0:
         st.markdown("  ", unsafe_allow_html=True)
         st.markdown("#### Detalhamento por Unidade")
 
-        col_sel1, col_sel2, col_sel3 = st.columns([2, 0.9, 0.7])
-        with col_sel1:
-            unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
-            selected_unidade = st.selectbox(
-                "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
-            )
-        with col_sel2:
-            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-            ano_selecionado = st.radio(
-                "Filtrar Ganho Acumulado no Ano:",
-                ["2026", "2027", "2028"],
-                horizontal=True
-            )
-        with col_sel3:
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-            modo_validado = st.toggle("✅ Validado", value=False, key="toggle_validado")
-
-        # Diagnóstico discreto para evitar dúvida quando novos SIMs forem adicionados
-        qtd_validados_geral = 0
-        col_validado_diag = encontrar_coluna(df, ["validado"])
-        if col_validado_diag:
-            qtd_validados_geral = int(df[col_validado_diag].apply(is_validado_sim).sum())
-        if modo_validado:
-            st.caption(f"Modo Validado ativo: {qtd_validados_geral} bobina(s) marcada(s) como SIM na base atual.")
+        unidade_names = ["Todas"] + df_unidades['unidade'].tolist()
+        selected_unidade = st.selectbox(
+            "Selecione a unidade:", unidade_names, index=0, key="unidade_selector"
+        )
 
         if selected_unidade == "Todas":
-            u_bobinas = total_bobinas
             u_peso = total_peso
             u_analisado = total_peso_analisado
-            u_ganho_previsto = total_ganho
-            u_ganho_validado_formulas = total_ganho_validado
-            u_pct = (total_peso_analisado / total_peso * 100) if total_peso > 0 else 0
+            u_bobinas = total_bobinas
+            u_pct = total_pct_geral
         else:
             row_u = df_unidades[df_unidades['unidade'] == selected_unidade].iloc[0]
             u_bobinas = int(row_u['bobinas'])
             u_peso = float(row_u['peso_total'])
             u_analisado = float(row_u['peso_analisado'])
-            u_ganho_previsto = float(row_u['ganho'])
-            u_ganho_validado_formulas = float(row_u['ganho_validado']) if 'ganho_validado' in row_u.index and pd.notna(row_u['ganho_validado']) else calcular_ganho_mensal_validado(df, selected_unidade)
             u_pct = float(row_u['pct'])
 
-        if modo_validado:
-            titulo_mensal = "Ganho Mensal (Validado)"
-            titulo_anual = f"Ganho Acumulado em {ano_selecionado} (Validado)"
-            u_ganho_exibido = u_ganho_validado_formulas
-            ganho_acumulado_ano = calcular_ganho_acumulado_ano(
-                df, selected_unidade, int(ano_selecionado), somente_validado=True
-            )
-            modo_card = "validado"
-        else:
-            titulo_mensal = "Ganho Mensal (Previsto)"
-            titulo_anual = f"Ganho Acumulado em {ano_selecionado} (Previsto)"
-            u_ganho_exibido = u_ganho_previsto
-            ganho_acumulado_ano = calcular_ganho_acumulado_ano(
-                df, selected_unidade, int(ano_selecionado), somente_validado=False
-            )
-            modo_card = "previsto"
-
-        uk1, uk2, uk3, uk4, uk5 = st.columns(5)
+        uk1, uk2, uk3, uk4 = st.columns(4)
         with uk1:
-            st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
+            st.metric("Bobinas", f"{u_bobinas:,}".replace(",", "."))
         with uk2:
-            st.metric("Peso Médio Analisado (MP)", f"{u_analisado:,.0f} ton".replace(",", "."))
+            st.metric("Peso Médio Total (MP)", f"{u_peso:,.0f} ton".replace(",", "."))
         with uk3:
-            st.metric("% Concluído", f"{u_pct:.1f}%")
+            st.metric("Peso Médio Analisado (MP)", f"{u_analisado:,.0f} ton".replace(",", "."))
         with uk4:
-            render_kpi_card(titulo_mensal, f"R$ {u_ganho_exibido:,.0f}".replace(",", "."), modo_card)
-        with uk5:
-            render_kpi_card(titulo_anual, f"R$ {ganho_acumulado_ano:,.0f}".replace(",", "."), modo_card)
-
+            st.metric("% Concluído", f"{u_pct:.1f}%")
 
     st.markdown("  ", unsafe_allow_html=True)
+
     # ============================================================
     # ABAS
     # ============================================================
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Visão Geral", "🔍 Análises", "💰 Financeiro", "📈 Timeline Financeiro"])
+    tab1, tab2 = st.tabs(["📊 Visão Geral", "🔍 Análises"])
 
     # ── ABA 1: VISÃO GERAL ──
     with tab1:
@@ -1252,7 +826,6 @@ def main():
             if not render_chart(fig_unid):
                 st.info("Coluna 'Unidade Delga' não encontrada.")
 
-        # Usinas
         fig_usinas = create_usinas_chart(df_usinas, 15)
         if not render_chart(fig_usinas):
             st.info("Dados de usinas não encontrados na aba Formulas.")
@@ -1266,23 +839,11 @@ def main():
 
             st.markdown("### Progresso de Análise por Unidade")
 
-            # Montagem robusta da tabela: evita erro quando novas colunas forem
-            # adicionadas na aba Formulas, como Ganho Validado na coluna H.
-            cols_display = ['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']
-            if 'ganho_validado' in df_unidades.columns:
-                cols_display.append('ganho_validado')
-
-            df_display = df_unidades[cols_display].copy()
-            df_display.columns = (
-                ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho Previsto (R$)']
-                + (['Ganho Validado (R$)'] if 'ganho_validado' in cols_display else [])
-            )
+            df_display = df_unidades[['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct']].copy()
+            df_display.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído']
             df_display['Peso Total (ton)'] = df_display['Peso Total (ton)'].round(1)
             df_display['Peso Analisado (ton)'] = df_display['Peso Analisado (ton)'].round(1)
             df_display['% Concluído'] = df_display['% Concluído'].apply(lambda x: f"{x:.1f}%")
-            df_display['Ganho Previsto (R$)'] = df_display['Ganho Previsto (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
-            if 'Ganho Validado (R$)' in df_display.columns:
-                df_display['Ganho Validado (R$)'] = df_display['Ganho Validado (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
         else:
             st.info("Dados de análise não encontrados na aba Formulas.")
@@ -1311,272 +872,6 @@ def main():
                 abc_dist.columns = ['Necessidade Total (ton)', 'Qtd Bobinas']
                 abc_dist['Necessidade Total (ton)'] = abc_dist['Necessidade Total (ton)'].round(1)
                 st.dataframe(abc_dist, use_container_width=True)
-
-    # ── ABA 3: FINANCEIRO ──
-    with tab3:
-        if len(df_unidades) > 0:
-            has_ganho = df_unidades['ganho'].sum() > 0
-
-            if has_ganho:
-                col_i, col_j = st.columns(2)
-                with col_i:
-                    fig_previsto = create_ganho_pie_chart(df_unidades)
-                    if fig_previsto:
-                        fig_previsto.update_layout(
-                            title=dict(
-                                text="Ganho Financeiro por Unidade (Previsto)",
-                                font=dict(size=16, color=COLORS["cyan"])
-                            )
-                        )
-                    render_chart(fig_previsto)
-                with col_j:
-                    fig_validado = create_ganho_validado_pie_chart(df, df_unidades)
-                    if not render_chart(fig_validado):
-                        st.info("Nenhum ganho validado encontrado ainda.")
-
-                if len(df_usinas) > 0 and df_usinas['ganho'].sum() > 0:
-                    st.markdown("### Ganho Financeiro por Usina")
-                    render_chart(create_ganho_usinas_chart(df_usinas))
-            else:
-                st.info(
-                    "Nenhum ganho financeiro registrado ainda. "
-                    "Os dados aparecerão conforme as análises forem concluídas na planilha."
-                )
-
-            st.markdown("### Resumo Financeiro por Unidade")
-            cols_fin = ['unidade', 'bobinas', 'peso_total', 'peso_analisado', 'pct', 'ganho']
-            if 'ganho_validado' in df_unidades.columns:
-                cols_fin.append('ganho_validado')
-            df_fin = df_unidades[cols_fin].copy()
-            df_fin.columns = ['Unidade', 'Bobinas', 'Peso Total (ton)', 'Peso Analisado (ton)', '% Concluído', 'Ganho Previsto (R$)'] + (['Ganho Validado (R$)'] if 'ganho_validado' in df_unidades.columns else [])
-            df_fin['Peso Total (ton)'] = df_fin['Peso Total (ton)'].round(1)
-            df_fin['Peso Analisado (ton)'] = df_fin['Peso Analisado (ton)'].round(1)
-            df_fin['% Concluído'] = df_fin['% Concluído'].apply(lambda x: f"{x:.1f}%")
-            df_fin['Ganho Previsto (R$)'] = df_fin['Ganho Previsto (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
-            if 'Ganho Validado (R$)' in df_fin.columns:
-                df_fin['Ganho Validado (R$)'] = df_fin['Ganho Validado (R$)'].apply(lambda x: f"R$ {x:,.0f}".replace(",", "."))
-            st.dataframe(df_fin, use_container_width=True, hide_index=True)
-        else:
-            st.info("Dados financeiros não encontrados na aba Formulas.")
-
-    # ── ABA 4: TIMELINE FINANCEIRO ──
-    with tab4:
-        st.markdown("### Timeline de Retorno Financeiro")
-        st.markdown("<p style='color:#5A7090; font-size:13px;'>Projeção do ganho mensal ao longo do tempo. Cada material contribui por 12 meses a partir do \"Primeiro Ganho Previsto\".</p>", unsafe_allow_html=True)
-
-        # Detectar coluna "Primeiro Ganho Previsto" (ou similar) - busca case-insensitive
-        ganho_prev_col = [c for c in df.columns if 'primeiro' in str(c).lower() and 'ganho' in str(c).lower()]
-        ganho_mensal_col = [c for c in df.columns if 'ganho' in str(c).lower() and 'mensal' in str(c).lower() and 'primeiro' not in str(c).lower()]
-        unidade_col_tl = [c for c in df.columns if 'unidade' in str(c).lower() and 'delga' in str(c).lower()]
-
-        if not ganho_prev_col:
-            st.info(
-                "⏳ Coluna 'Primeiro Ganho Previsto' não encontrada no arquivo atual.\n\n"
-                "Quando você adicionar essa coluna na planilha (com valores como jan/26, fev/26, etc.) "
-                "e fizer upload, o gráfico de timeline aparecerá automaticamente."
-            )
-        elif not ganho_mensal_col:
-            st.info("Coluna 'Ganho mensal' não encontrada.")
-        elif not unidade_col_tl:
-            st.info("Coluna 'Unidade Delga' não encontrada.")
-        else:
-            # Processar timeline
-            col_prev = ganho_prev_col[0]
-            col_ganho_m = ganho_mensal_col[0]
-            col_unid = unidade_col_tl[0]
-
-            df_tl = df[[col_unid, col_ganho_m, col_prev]].copy()
-            df_tl[col_unid] = df_tl[col_unid].apply(normalizar_unidade)
-            df_tl['ganho_num'] = df_tl[col_ganho_m].apply(parse_numero_brasileiro)
-            df_tl = df_tl[df_tl['ganho_num'] > 0].copy()
-            df_tl['primeiro_ganho_str'] = df_tl[col_prev].astype(str).str.strip()
-
-            # Filtrar apenas linhas com data válida
-            df_tl = df_tl[df_tl['primeiro_ganho_str'].notna() & (df_tl['primeiro_ganho_str'] != '') & (df_tl['primeiro_ganho_str'] != 'nan') & (df_tl['primeiro_ganho_str'] != '0')]
-
-            if len(df_tl) == 0:
-                st.info(
-                    "⏳ Nenhum material com 'Primeiro Ganho Previsto' preenchido ainda.\n\n"
-                    "Preencha a coluna na planilha com o mês/ano (ex: jan/26, out/26) "
-                    "para ver a projeção de retorno financeiro."
-                )
-            else:
-                # Converter para datetime - suporta múltiplos formatos
-                meses_map = {
-                    'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-                    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12,
-                    'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3,
-                    'abril': 4, 'maio': 5, 'junho': 6, 'julho': 7,
-                    'agosto': 8, 'setembro': 9, 'outubro': 10,
-                    'novembro': 11, 'dezembro': 12
-                }
-
-                def parse_mes_ano(val):
-                    """Converte múltiplos formatos para datetime:
-                    - datetime/Timestamp direto do Excel (2026-03-01)
-                    - 'jan/26', 'out/27'
-                    - 'março, 2026', 'maio, 2026'
-                    - 'março 2026'
-                    """
-                    try:
-                        # Se já é datetime/Timestamp
-                        if isinstance(val, (pd.Timestamp,)):
-                            return val.replace(day=1)
-                        import datetime
-                        if isinstance(val, datetime.datetime):
-                            return pd.Timestamp(val).replace(day=1)
-
-                        val_str = str(val).strip().lower()
-
-                        # Tentar pd.to_datetime direto (pega '2026-03-01 00:00:00')
-                        try:
-                            parsed = pd.to_datetime(val_str)
-                            if pd.notna(parsed):
-                                return parsed.replace(day=1)
-                        except:
-                            pass
-
-                        # Formato 'março, 2026' ou 'maio, 2026'
-                        for sep in [',', ' ']:
-                            if sep in val_str:
-                                parts = [p.strip() for p in val_str.split(sep) if p.strip()]
-                                if len(parts) == 2:
-                                    mes_str = parts[0].lower()
-                                    ano_str = parts[1]
-                                    mes = meses_map.get(mes_str)
-                                    if mes:
-                                        ano = int(ano_str)
-                                        if ano < 100:
-                                            ano += 2000
-                                        return pd.Timestamp(year=ano, month=mes, day=1)
-
-                        # Formato 'jan/26' ou 'out/27'
-                        for sep in ['/', '-']:
-                            if sep in val_str:
-                                parts = val_str.split(sep)
-                                if len(parts) == 2:
-                                    mes_str = parts[0].strip()[:3]
-                                    ano_str = parts[1].strip()
-                                    mes = meses_map.get(mes_str)
-                                    if mes:
-                                        ano = int(ano_str)
-                                        if ano < 100:
-                                            ano += 2000
-                                        return pd.Timestamp(year=ano, month=mes, day=1)
-                    except:
-                        pass
-                    return None
-
-                # Primeiro tentar converter direto da coluna original (pode ser datetime)
-                col_prev_original = df_tl[col_prev]
-                df_tl['data_inicio'] = col_prev_original.apply(parse_mes_ano)
-                df_tl = df_tl[df_tl['data_inicio'].notna()]
-
-                if len(df_tl) == 0:
-                    st.info("Não foi possível interpretar as datas na coluna 'Primeiro Ganho Previsto'. Use o formato mes/ano (ex: jan/26, out/26).")
-                else:
-                    # Gerar range de meses (do primeiro ao último + 12)
-                    data_min = df_tl['data_inicio'].min()
-                    data_max = df_tl['data_inicio'].max() + pd.DateOffset(months=11)
-                    meses_range = pd.date_range(start=data_min, end=data_max, freq='MS')
-
-                    # Calcular ganho por mês por unidade
-                    unidades_presentes = df_tl[col_unid].unique().tolist()
-                    timeline_data = {}
-
-                    for unidade in unidades_presentes:
-                        timeline_data[unidade] = pd.Series(0.0, index=meses_range)
-
-                    timeline_data['Total Geral'] = pd.Series(0.0, index=meses_range)
-
-                    for _, row in df_tl.iterrows():
-                        inicio = row['data_inicio']
-                        ganho = row['ganho_num']
-                        unidade = row[col_unid]
-                        # Distribuir ganho por 12 meses
-                        for m in range(12):
-                            mes_atual = inicio + pd.DateOffset(months=m)
-                            if mes_atual in meses_range:
-                                if unidade in timeline_data:
-                                    timeline_data[unidade].loc[mes_atual] += ganho
-                                timeline_data['Total Geral'].loc[mes_atual] += ganho
-
-                    # Calcular acumulado por unidade
-                    acumulado_data = {}
-                    for key in timeline_data:
-                        acumulado_data[key] = timeline_data[key].cumsum()
-
-                    # Criar gráfico
-                    fig_tl = go.Figure()
-
-                    # Adicionar linha de cada unidade
-                    for unidade in unidades_presentes:
-                        color = get_unidade_color(unidade)
-                        acum_values = acumulado_data[unidade].values
-                        
-                        # CORREÇÃO: Garantir que 'unidade' seja sempre um texto válido
-                        unidade_texto = str(unidade) if pd.notna(unidade) and str(unidade).lower() != 'nan' else "Desconhecida"
-                        
-                        fig_tl.add_trace(go.Scatter(
-                            x=meses_range,
-                            y=timeline_data[unidade].values,
-                            mode='lines+markers',
-                            name=unidade_texto,
-                            line=dict(color=color, width=2),
-                            marker=dict(size=5),
-                            customdata=acum_values,
-                            hovertemplate=f'%{{x|%b/%Y}}  Ganho Mês: <b>R$ %{{y:,.0f}}</b>  Acumulado: <b>R$ %{{customdata:,.0f}}</b><extra>{unidade_texto}</extra>'
-                        ))
-
-                    # Linha Total Geral (azul mais forte, mais grossa)
-                    acum_total = acumulado_data['Total Geral'].values
-                    fig_tl.add_trace(go.Scatter(
-                        x=meses_range,
-                        y=timeline_data['Total Geral'].values,
-                        mode='lines+markers',
-                        name='Total Geral',
-                        line=dict(color='#1400FF', width=3.5),
-                        marker=dict(size=7),
-                        customdata=acum_total,
-                        hovertemplate='%{x|%b/%Y} Ganho Mês: <b>R$ %{y:,.0f}</b>  Acumulado: <b>R$ %{customdata:,.0f}</b><extra>Total Geral</extra>'
-                    ))
-
-                    fig_tl.update_layout(
-                        title=dict(text="Projeção de Ganho Mensal por Período", font=dict(size=16, color=COLORS["cyan"])),
-                        xaxis=dict(
-                            title="Mês",
-                            tickformat='%b/%Y',
-                            dtick='M1',
-                            gridcolor='#1A2744',
-                            color='#8899B0',
-                        ),
-                        yaxis=dict(
-                            title="Ganho Mensal (R$)",
-                            gridcolor='#1A2744',
-                            color='#8899B0',
-                            tickformat=',.0f',
-                        ),
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        font=dict(color='#8899B0'),
-                        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                        hovermode='x unified',
-                        height=500,
-                        margin=dict(l=60, r=20, t=60, b=60),
-                    )
-
-                    st.plotly_chart(fig_tl, use_container_width=True, theme=None)
-
-                    # Tabela resumo
-                    st.markdown("### Resumo por Mês")
-                    df_resumo = pd.DataFrame(timeline_data)
-                    df_resumo.index = df_resumo.index.strftime('%b/%Y')
-                    df_resumo = df_resumo.round(0).astype(int)
-                    # Formatar como moeda
-                    df_display_tl = df_resumo.copy()
-                    for col in df_display_tl.columns:
-                        df_display_tl[col] = df_display_tl[col].apply(lambda x: f"R$ {x:,.0f}".replace(",", ".") if x > 0 else "-")
-                    st.dataframe(df_display_tl, use_container_width=True)
 
 
 if __name__ == "__main__":
