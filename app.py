@@ -187,6 +187,20 @@ st.markdown("""
     .tl-pct { width:90px; text-align:right; flex-shrink:0; }
     .tl-pct-num { font-size:22px; font-weight:800; color:#1F2937; }
     .tl-pct-label { font-size:10.5px; color:#64748B; }
+
+    /* ===== Tabela clara (substitui st.dataframe em pontos específicos) ===== */
+    .light-table-wrap { border:1px solid #E2E6F0; border-radius:10px; overflow:hidden; margin: 6px 0 18px 0; }
+    table.light-table { width:100%; border-collapse:collapse; background:#FFFFFF; }
+    table.light-table thead th {
+        background:#F4F6FB; color:#475569; text-align:left; font-size:12px;
+        text-transform:uppercase; letter-spacing:.4px; font-weight:700;
+        padding:10px 14px; border-bottom:1px solid #E2E6F0;
+    }
+    table.light-table tbody td {
+        color:#1F2937; font-size:13.5px; padding:10px 14px; border-bottom:1px solid #EEF1F7;
+    }
+    table.light-table tbody tr:last-child td { border-bottom:none; }
+    table.light-table tbody tr:hover td { background:#F8FAFD; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -237,8 +251,9 @@ ADMIN_PASSWORD = "M@ster"
 # ============================================================
 # CONFIGURAÇÃO DA ABA "A.Propostas" (Acompanhamento)
 # ============================================================
-# Coluna "PASSADO PARA USINA ?" + as 7 etapas seguintes (colunas X até AD)
+# Coluna "FORMALIZADO COM COMPRAS" + "PASSADO PARA USINA ?" + as 7 etapas seguintes
 STAGE_DEFS = [
+    ("FORMALIZADO COM COMPRAS", "Formalização com Compras"),
     ("DATA ENVIO P/ USINA", "Envio à Usina"),
     ("PRAZO DA USINA PARA RETORNO", "Retorno da Usina"),
     ("DATA DE DEVOLUÇÃO DA CONSULTA", "Devolução da Consulta"),
@@ -582,9 +597,28 @@ def normalizar_texto_simples(valor, default='Desconhecida'):
     return txt.upper() if txt else default
 
 
+def classify_formalizacao(valor_formalizacao, passado_usina, data_envio_usina):
+    """Classifica a etapa 'Formalização com Compras'.
+    Regra: se a célula tiver uma data, usa essa data normalmente.
+    Se não tiver data, mas a proposta já foi 'PASSADO PARA USINA = SIM' e já
+    existe 'DATA ENVIO P/ USINA', consideramos a formalização automaticamente
+    OK (afinal, só foi enviado à usina depois de formalizado com compras).
+    Caso contrário, devolve exatamente o que está escrito na célula
+    (ex.: 'Data não informada.'), para sabermos há quanto tempo está parado."""
+    status_f, texto_f = classify_stage_value(valor_formalizacao)
+    if status_f == 'done':
+        return status_f, texto_f
+
+    status_e, texto_e = classify_stage_value(data_envio_usina)
+    if 'SIM' in str(passado_usina).upper() and status_e == 'done':
+        return 'done', f'OK (enviado à usina em {texto_e})'
+
+    return status_f, texto_f
+
+
 def process_propostas(df_raw):
     """Processa a aba 'A.Propostas': normaliza colunas e calcula, para cada
-    proposta, o status de cada uma das 7 etapas e o percentual de conclusão."""
+    proposta, o status de cada uma das 8 etapas e o percentual de conclusão."""
     if df_raw is None:
         return None
 
@@ -606,6 +640,7 @@ def process_propostas(df_raw):
     col_passado = next((c for c in df.columns if 'PASSADO PARA USINA' in c.upper()), None)
     col_reducao = next((c for c in df.columns if 'REDUÇÃO POTENCIAL' in c.upper()), None)
     col_consumo = next((c for c in df.columns if 'MÉDIA CONSUMO' in c.upper()), None)
+    col_envio_usina = next((c for c in df.columns if c.strip().upper() == 'DATA ENVIO P/ USINA'), None)
 
     df['_DESCRICAO'] = df[col_desc].astype(str).str.strip() if col_desc else ''
     df['_PLANTA'] = df[col_planta].apply(lambda x: normalizar_texto_simples(x)) if col_planta else 'Desconhecida'
@@ -625,7 +660,13 @@ def process_propostas(df_raw):
         stages = []
         completed = 0
         for col, label in available_stages:
-            status, texto = classify_stage_value(row.get(col))
+            if col == 'FORMALIZADO COM COMPRAS':
+                status, texto = classify_formalizacao(
+                    row.get(col), row['_PASSADO'],
+                    row.get(col_envio_usina) if col_envio_usina else None,
+                )
+            else:
+                status, texto = classify_stage_value(row.get(col))
             if status in ('done', 'na'):
                 completed += 1
             stages.append({'col': col, 'label': label, 'status': status, 'texto': texto})
@@ -1041,6 +1082,26 @@ def render_chart(fig):
     return False
 
 
+def build_light_table_html(df_table):
+    """Gera uma tabela HTML com o tema claro do dashboard. Usada no lugar de
+    st.dataframe, que renderiza em canvas e não respeita a folha de estilo
+    customizada (ficava com fundo azul-escuro mesmo no tema claro)."""
+    headers_html = ''.join(f'<th>{html_lib.escape(str(c))}</th>' for c in df_table.columns)
+    rows_html = []
+    for _, r in df_table.iterrows():
+        cells = ''.join(f'<td>{html_lib.escape(str(v))}</td>' for v in r)
+        rows_html.append(f'<tr>{cells}</tr>')
+    table_html = (
+        '<div class="light-table-wrap">'
+        '<table class="light-table">'
+        f'<thead><tr>{headers_html}</tr></thead>'
+        f'<tbody>{"".join(rows_html)}</tbody>'
+        '</table>'
+        '</div>'
+    )
+    return table_html
+
+
 # ============================================================
 # APLICAÇÃO PRINCIPAL
 # ============================================================
@@ -1256,7 +1317,7 @@ def main():
             df_display['Peso Total (ton)'] = df_display['Peso Total (ton)'].round(1)
             df_display['Peso Analisado (ton)'] = df_display['Peso Analisado (ton)'].round(1)
             df_display['% Concluído'] = df_display['% Concluído'].apply(lambda x: f"{x:.1f}%")
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.markdown(build_light_table_html(df_display), unsafe_allow_html=True)
         else:
             st.info("Dados de análise não encontrados na aba Formulas.")
 
@@ -1283,7 +1344,8 @@ def main():
                 abc_dist = df_abc.groupby(abc_col[0])[col_media].agg(['sum', 'count']).sort_values('sum', ascending=False)
                 abc_dist.columns = ['Necessidade Total (ton)', 'Qtd Bobinas']
                 abc_dist['Necessidade Total (ton)'] = abc_dist['Necessidade Total (ton)'].round(1)
-                st.dataframe(abc_dist, use_container_width=True)
+                abc_display = abc_dist.reset_index().rename(columns={abc_dist.index.name or 'index': 'ABC'})
+                st.markdown(build_light_table_html(abc_display), unsafe_allow_html=True)
 
     # ── ABA 3: ACOMPANHAMENTO (Propostas BSW) ──
     with tab3:
@@ -1342,7 +1404,7 @@ def main():
                 st.markdown("### Linha do Tempo por Proposta")
                 st.markdown(
                     '<p style="color:#64748B; font-size:12px; margin-top:-8px;">'
-                    'Cada bolinha representa uma das 7 etapas do processo. '
+                    'Cada bolinha representa uma das 8 etapas do processo. '
                     '<span style="color:#1400FF;">●</span> concluída / não se aplica &nbsp; '
                     '<span style="color:#FFB800;">○</span> pendente &nbsp; '
                     '<span style="color:#4DA3FF;">○</span> prevista (data futura) &nbsp; '
