@@ -4,6 +4,7 @@ Dashboard de Controle de Matéria-Prima — Bobinas BSW
 - Admin atualiza os dados via upload protegido por senha
 - Dados persistem no GitHub (não somem quando o app dorme)
 """
+import html as html_lib
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -29,7 +30,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' );
-    
+
     .stApp { background-color: #080E1A; font-family: 'Inter', sans-serif; }
     header[data-testid="stHeader"] { background-color: #080E1A; }
     section[data-testid="stSidebar"] { background-color: #0C1425; border-right: 1px solid #1A2744; }
@@ -64,6 +65,53 @@ st.markdown("""
     .stSelectbox label { color: #8899B0 !important; }
     .stButton > button[kind="primary"] { background-color: #1400FF !important; border: none; }
     .stButton > button[kind="primary"]:hover { background-color: #2010FF !important; }
+
+    /* ===== Aba Acompanhamento (timeline) ===== */
+    .acomp-block { margin-bottom: 26px; }
+    .acomp-header {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:12px 16px; background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
+        border:1px solid #1A2744; border-radius:10px 10px 0 0;
+    }
+    .acomp-header-title { display:flex; align-items:center; gap:10px; }
+    .acomp-dot { width:13px; height:13px; border-radius:4px; flex-shrink:0; }
+    .acomp-header-title b { color:#FFFFFF; font-size:14px; letter-spacing:.3px; }
+    .acomp-header-sub { color:#5A7090; font-size:11px; }
+    .acomp-header-stats { display:flex; gap:18px; }
+    .acomp-stat { text-align:right; }
+    .acomp-stat-val { color:#ECEFF1; font-weight:700; font-size:15px; }
+    .acomp-stat-lbl { color:#5A7090; font-size:9px; text-transform:uppercase; letter-spacing:.5px; }
+    .acomp-rows { border:1px solid #1A2744; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
+
+    .tl-row { display:flex; align-items:center; padding:14px 18px; border-bottom:1px solid #16213a; gap:18px; }
+    .tl-row:last-child { border-bottom:none; }
+    .tl-row:hover { background:#0F1A2E; }
+
+    .tl-info { width:240px; flex-shrink:0; }
+    .tl-code { color:#ECEFF1; font-weight:700; font-size:13px; }
+    .tl-desc { color:#5A7090; font-size:10.5px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-meta { color:#3F5575; font-size:10px; margin-top:4px; }
+    .tl-badge {
+        display:inline-block; font-size:9.5px; padding:3px 9px; border-radius:20px;
+        margin-top:6px; font-weight:700; letter-spacing:.3px;
+    }
+
+    .tl-track { flex:1; position:relative; height:50px; min-width:320px; }
+    .tl-line-bg { position:absolute; top:17px; left:10px; right:10px; height:3px; background:#1A2744; border-radius:2px; }
+    .tl-line-fill { position:absolute; top:17px; left:10px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
+    .tl-nodes { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:space-between; }
+    .tl-node { display:flex; flex-direction:column; align-items:center; width:18px; position:relative; }
+    .tl-dot { width:18px; height:18px; border-radius:50%; border:2.5px solid #1A2744; background:#0C1425; z-index:1; box-sizing:border-box; }
+    .tl-dot.done { background:#1400FF; border-color:#1400FF; }
+    .tl-dot.na { background:#00E676; border-color:#00E676; }
+    .tl-dot.planned { background:#0C1425; border-color:#4DA3FF; }
+    .tl-dot.pending { background:#0C1425; border-color:#FFB800; }
+    .tl-dot.empty { background:#0C1425; border-color:#26344E; }
+    .tl-label { font-size:8.5px; color:#46608A; margin-top:5px; text-align:center; width:74px; transform:translateX(-28px); line-height:1.25; }
+
+    .tl-pct { width:80px; text-align:right; flex-shrink:0; }
+    .tl-pct-num { font-size:19px; font-weight:800; color:#ECEFF1; }
+    .tl-pct-label { font-size:9.5px; color:#5A7090; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -111,6 +159,28 @@ GITHUB_BRANCH = "main"
 
 ADMIN_PASSWORD = "M@ster"
 
+# ============================================================
+# CONFIGURAÇÃO DA ABA "A.Propostas" (Acompanhamento)
+# ============================================================
+# Coluna "PASSADO PARA USINA ?" + as 7 etapas seguintes (colunas X até AD)
+STAGE_DEFS = [
+    ("DATA ENVIO P/ USINA", "Envio à Usina"),
+    ("PRAZO DA USINA PARA RETORNO", "Retorno da Usina"),
+    ("DATA DE DEVOLUÇÃO DA CONSULTA", "Devolução da Consulta"),
+    ("ENVIO DE PLANO DE CORTE PARA COMPRAS", "Plano de Corte → Compras"),
+    ("ENVIO DO PLANO DE CORTE PARA USINAS", "Plano de Corte → Usina"),
+    ("PRAZO PARA CADASTRO DO NOVO PN (LIBERAR PROGRAMAÇÃO)", "Cadastro Novo PN"),
+    ("PRAZO DE RECEBIMENTO NAS NOVAS ESPECIFICAÇÕES (APROXIMADO)", "Recebimento Material"),
+]
+
+STAGE_STATUS_COLOR = {
+    "done": "#1400FF",
+    "na": "#00E676",
+    "planned": "#4DA3FF",
+    "pending": "#FFB800",
+    "empty": "#26344E",
+}
+
 
 def get_github_token():
     try:
@@ -137,7 +207,7 @@ def get_unidade_colors_list(names):
 def load_data_from_github():
     token = get_github_token()
     if not token:
-        return None, None
+        return None, None, None
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_DATA_PATH}"
     headers = {
@@ -154,8 +224,10 @@ def load_data_from_github():
         df_controle = smart_read_excel(excel_bytes, "Controle")
         excel_bytes.seek(0)
         df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
-        return df_controle, df_formulas
-    return None, None
+        excel_bytes.seek(0)
+        df_propostas = smart_read_propostas(excel_bytes)
+        return df_controle, df_formulas, df_propostas
+    return None, None, None
 
 
 def save_data_to_github(file_bytes, filename):
@@ -231,7 +303,22 @@ def load_data_from_sharepoint():
     df_controle = smart_read_excel(excel_bytes, "Controle")
     excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
-    return df_controle, df_formulas
+    excel_bytes.seek(0)
+    df_propostas = smart_read_propostas(excel_bytes)
+    return df_controle, df_formulas, df_propostas
+
+
+def find_header_row(excel_bytes, sheet_name, markers, max_scan=15):
+    """Procura, dentro das primeiras linhas de uma aba, a linha que contém os
+    cabeçalhos reais (algumas abas têm títulos/linhas em branco antes)."""
+    excel_bytes.seek(0)
+    df_raw = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=None, nrows=max_scan)
+    for row_idx in range(len(df_raw)):
+        row_vals = [str(v).replace('\n', ' ').strip().upper() for v in df_raw.iloc[row_idx] if pd.notna(v)]
+        for marker in markers:
+            if any(marker.upper() in v for v in row_vals):
+                return row_idx
+    return 0
 
 
 def smart_read_excel(excel_bytes, sheet_name):
@@ -249,12 +336,35 @@ def smart_read_excel(excel_bytes, sheet_name):
     return df
 
 
+def smart_read_propostas(excel_bytes):
+    """Lê a aba 'A.Propostas' (controle de acompanhamento de propostas BSW).
+    Retorna None se a aba não existir no arquivo (compatibilidade com arquivos antigos)."""
+    try:
+        excel_bytes.seek(0)
+        xls = pd.ExcelFile(excel_bytes)
+        sheet_name = None
+        for s in xls.sheet_names:
+            if s.strip().upper().replace(' ', '') in ('A.PROPOSTAS', 'APROPOSTAS'):
+                sheet_name = s
+                break
+        if sheet_name is None:
+            return None
+        header_row = find_header_row(excel_bytes, sheet_name, ['CÓDIGO DELGA', 'CODIGO DELGA'])
+        excel_bytes.seek(0)
+        df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=header_row)
+        return df
+    except Exception:
+        return None
+
+
 def load_data_from_upload(uploaded_file):
     excel_bytes = io.BytesIO(uploaded_file.getvalue())
     df_controle = smart_read_excel(excel_bytes, "Controle")
     excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
-    return df_controle, df_formulas
+    excel_bytes.seek(0)
+    df_propostas = smart_read_propostas(excel_bytes)
+    return df_controle, df_formulas, df_propostas
 
 
 def process_data(df_raw):
@@ -358,6 +468,202 @@ def parse_formulas(df_formulas):
     df_unidades = pd.DataFrame(unidades) if unidades else pd.DataFrame()
     df_usinas = pd.DataFrame(usinas) if usinas else pd.DataFrame()
     return df_unidades, df_usinas
+
+
+# ============================================================
+# FUNÇÕES DA ABA "A.Propostas" (Acompanhamento)
+# ============================================================
+def classify_stage_value(v):
+    """Classifica o valor de uma célula de etapa em:
+    done (data já passou), planned (data futura), na (não se aplica),
+    pending (texto tipo 'PENDENTE'/outro), empty (vazio)."""
+    if pd.isna(v):
+        return 'empty', ''
+    if isinstance(v, str) and v.strip() == '':
+        return 'empty', ''
+    if isinstance(v, (pd.Timestamp, datetime)):
+        d = pd.Timestamp(v)
+        texto = d.strftime('%d/%m/%Y')
+        if d.date() <= datetime.now().date():
+            return 'done', texto
+        return 'planned', texto
+    txt = str(v).strip()
+    up = txt.upper()
+    if up in ('N/A', 'NA', 'NÃO SE APLICA', 'NAO SE APLICA', '-'):
+        return 'na', 'N/A'
+    if 'PENDENTE' in up:
+        return 'pending', 'Pendente'
+    return 'pending', txt[:40]
+
+
+def normalizar_texto_simples(valor, default='Desconhecida'):
+    if pd.isna(valor):
+        return default
+    txt = str(valor).replace('\n', ' / ').strip()
+    txt = ' '.join(txt.split())
+    return txt.upper() if txt else default
+
+
+def process_propostas(df_raw):
+    """Processa a aba 'A.Propostas': normaliza colunas e calcula, para cada
+    proposta, o status de cada uma das 7 etapas e o percentual de conclusão."""
+    if df_raw is None:
+        return None
+
+    df = df_raw.copy()
+    df.columns = [str(c).replace('\n', ' ').strip() for c in df.columns]
+
+    col_codigo = next((c for c in df.columns if c.strip().upper() == 'CÓDIGO DELGA'), None)
+    if col_codigo is None:
+        return None
+    df = df[df[col_codigo].notna() & (df[col_codigo].astype(str).str.strip() != '')].copy()
+    if len(df) == 0:
+        return None
+
+    df = df.rename(columns={col_codigo: 'CÓDIGO DELGA'})
+
+    col_desc = next((c for c in df.columns if 'DESCRIÇÃO' in c.upper()), None)
+    col_planta = next((c for c in df.columns if 'PLANTA DELGA' in c.upper()), None)
+    col_fonte = next((c for c in df.columns if c.strip().upper() == 'FONTE'), None)
+    col_passado = next((c for c in df.columns if 'PASSADO PARA USINA' in c.upper()), None)
+    col_reducao = next((c for c in df.columns if 'REDUÇÃO POTENCIAL' in c.upper()), None)
+    col_consumo = next((c for c in df.columns if 'MÉDIA CONSUMO' in c.upper()), None)
+
+    df['_DESCRICAO'] = df[col_desc].astype(str).str.strip() if col_desc else ''
+    df['_PLANTA'] = df[col_planta].apply(lambda x: normalizar_texto_simples(x)) if col_planta else 'Desconhecida'
+    df['_FONTE'] = df[col_fonte].apply(lambda x: normalizar_texto_simples(x)) if col_fonte else 'Desconhecida'
+    df['_PASSADO'] = df[col_passado].apply(lambda x: normalizar_texto_simples(x, default='')) if col_passado else ''
+    df['_REDUCAO'] = df[col_reducao].apply(parse_numero_brasileiro) if col_reducao else 0.0
+    df['_CONSUMO'] = df[col_consumo].apply(parse_numero_brasileiro) if col_consumo else 0.0
+
+    stage_status_list = []
+    pct_list = []
+    badge_list = []
+    completed_list = []
+
+    available_stages = [(c, label) for c, label in STAGE_DEFS if c in df.columns]
+
+    for _, row in df.iterrows():
+        stages = []
+        completed = 0
+        for col, label in available_stages:
+            status, texto = classify_stage_value(row.get(col))
+            if status in ('done', 'na'):
+                completed += 1
+            stages.append({'col': col, 'label': label, 'status': status, 'texto': texto})
+
+        n_stages = len(available_stages) if available_stages else 1
+        passado = row['_PASSADO']
+
+        if 'NÃO' in passado or passado == 'NAO':
+            pct = 0
+            badge = ('Não enviado à usina', COLORS['coral'])
+        elif 'KAIZEN' in passado:
+            pct = round(completed / n_stages * 100)
+            badge = ('Kaizen Plano de Corte', COLORS['purple'])
+        elif completed == n_stages and n_stages > 0:
+            pct = 100
+            badge = ('Concluído', COLORS['emerald'])
+        elif completed == 0:
+            pct = 0
+            badge = ('Aguardando início', COLORS['text_light'])
+        else:
+            pct = round(completed / n_stages * 100)
+            badge = ('Em andamento', COLORS['cyan'])
+
+        stage_status_list.append(stages)
+        pct_list.append(pct)
+        badge_list.append(badge)
+        completed_list.append(completed)
+
+    df['_STAGES'] = stage_status_list
+    df['_PCT'] = pct_list
+    df['_BADGE'] = badge_list
+    df['_COMPLETED'] = completed_list
+    df['_N_STAGES'] = len(available_stages) if available_stages else 0
+
+    return df
+
+
+def render_timeline_row_html(row):
+    n_stages = max(row['_N_STAGES'], 1)
+    pct = row['_PCT']
+    codigo = html_lib.escape(str(row['CÓDIGO DELGA']))
+    desc = html_lib.escape(str(row['_DESCRICAO'])[:60])
+    badge_label, badge_color = row['_BADGE']
+
+    nodes_html = []
+    for st_info in row['_STAGES']:
+        status = st_info['status']
+        label = html_lib.escape(st_info['label'])
+        texto = html_lib.escape(st_info['texto']) if st_info['texto'] else 'Não iniciado'
+        tooltip = f"{label}: {texto}"
+        nodes_html.append(
+            f'<div class="tl-node" title="{tooltip}">'
+            f'<div class="tl-dot {status}"></div>'
+            f'<div class="tl-label">{label}</div>'
+            f'</div>'
+        )
+
+    reducao_txt = f"R$ {row['_REDUCAO']:,.0f}".replace(",", ".") if row['_REDUCAO'] else ""
+    fonte_txt = html_lib.escape(str(row['_FONTE']))
+    meta_txt = " · ".join([t for t in [fonte_txt, reducao_txt] if t])
+
+    row_html = f"""
+    <div class="tl-row">
+        <div class="tl-info">
+            <div class="tl-code">{codigo}</div>
+            <div class="tl-desc">{desc}</div>
+            <div class="tl-meta">{meta_txt}</div>
+            <span class="tl-badge" style="background:{badge_color}22; color:{badge_color}; border:1px solid {badge_color}55;">{badge_label}</span>
+        </div>
+        <div class="tl-track">
+            <div class="tl-line-bg"></div>
+            <div class="tl-line-fill" style="width:{pct}%;"></div>
+            <div class="tl-nodes">{''.join(nodes_html)}</div>
+        </div>
+        <div class="tl-pct">
+            <div class="tl-pct-num">{pct}%</div>
+            <div class="tl-pct-label">concluído</div>
+        </div>
+    </div>
+    """
+    return row_html
+
+
+def render_acompanhamento_block(planta, df_grupo):
+    color = get_unidade_color(planta)
+    avg_pct = df_grupo['_PCT'].mean() if len(df_grupo) else 0
+    n_itens = len(df_grupo)
+    n_concluidos = int((df_grupo['_PCT'] == 100).sum())
+
+    rows_html = ''.join(render_timeline_row_html(r) for _, r in df_grupo.iterrows())
+
+    block_html = f"""
+    <div class="acomp-block">
+        <div class="acomp-header">
+            <div class="acomp-header-title">
+                <div class="acomp-dot" style="background:{color};"></div>
+                <div>
+                    <b>{html_lib.escape(str(planta))}</b><br/>
+                    <span class="acomp-header-sub">{n_itens} propostas</span>
+                </div>
+            </div>
+            <div class="acomp-header-stats">
+                <div class="acomp-stat">
+                    <div class="acomp-stat-val">{avg_pct:.0f}%</div>
+                    <div class="acomp-stat-lbl">Progresso Médio</div>
+                </div>
+                <div class="acomp-stat">
+                    <div class="acomp-stat-val">{n_concluidos}</div>
+                    <div class="acomp-stat-lbl">Concluídas</div>
+                </div>
+            </div>
+        </div>
+        <div class="acomp-rows">{rows_html}</div>
+    </div>
+    """
+    return block_html
 
 
 # ============================================================
@@ -590,6 +896,28 @@ def create_unidade_bar_chart(df, col_media):
     return fig
 
 
+def create_propostas_progress_chart(df_propostas):
+    if df_propostas is None or len(df_propostas) == 0:
+        return None
+    dist = df_propostas.groupby('_PLANTA')['_PCT'].mean().sort_values(ascending=True)
+    colors = get_unidade_colors_list(dist.index)
+    fig = go.Figure(data=[go.Bar(
+        x=dist.values.tolist(),
+        y=[str(x) for x in dist.index],
+        orientation='h',
+        marker=dict(color=colors),
+        hovertemplate='%{y}  <b>%{x:.0f}%% concluído</b><extra></extra>',
+    )])
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Progresso Médio das Propostas por Planta Delga", font=dict(size=16, color=COLORS["cyan"])),
+        height=max(300, len(dist) * 50),
+        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="% Concluído", range=[0, 100]),
+    )
+    return fig
+
+
 def parse_numero_brasileiro(valor):
     if pd.isna(valor):
         return 0.0
@@ -709,17 +1037,18 @@ def main():
     # ============================================================
     df_raw = None
     df_formulas = None
+    df_propostas_raw = None
 
     try:
-        df_raw, df_formulas = load_data_from_github()
+        df_raw, df_formulas, df_propostas_raw = load_data_from_github()
     except Exception:
-        df_raw, df_formulas = None, None
+        df_raw, df_formulas, df_propostas_raw = None, None, None
 
     if df_raw is None:
         try:
-            df_raw, df_formulas = load_data_from_sharepoint()
+            df_raw, df_formulas, df_propostas_raw = load_data_from_sharepoint()
         except Exception:
-            df_raw, df_formulas = None, None
+            df_raw, df_formulas, df_propostas_raw = None, None, None
 
     if df_raw is None:
         st.markdown("""
@@ -737,6 +1066,7 @@ def main():
 
     df, col_names = process_data(df_raw)
     df_unidades, df_usinas = parse_formulas(df_formulas)
+    df_propostas = process_propostas(df_propostas_raw)
 
     col_media = col_names.get('media', '')
     if not col_media:
@@ -804,7 +1134,7 @@ def main():
     # ============================================================
     # ABAS
     # ============================================================
-    tab1, tab2 = st.tabs(["📊 Visão Geral", "🔍 Análises"])
+    tab1, tab2, tab3 = st.tabs(["📊 Visão Geral", "🔍 Análises", "🛠️ Acompanhamento"])
 
     # ── ABA 1: VISÃO GERAL ──
     with tab1:
@@ -872,6 +1202,90 @@ def main():
                 abc_dist.columns = ['Necessidade Total (ton)', 'Qtd Bobinas']
                 abc_dist['Necessidade Total (ton)'] = abc_dist['Necessidade Total (ton)'].round(1)
                 st.dataframe(abc_dist, use_container_width=True)
+
+    # ── ABA 3: ACOMPANHAMENTO (Propostas BSW) ──
+    with tab3:
+        if df_propostas is None or len(df_propostas) == 0:
+            st.markdown("""
+            <div style="text-align:center; padding:60px 20px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border:2px dashed #1A2744; border-radius:16px; margin:20px auto; max-width:600px;">
+                <span style="font-size:48px;">🛠️</span>
+                <h3 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aba "A.Propostas" não encontrada</h3>
+                <p style="color:#5A7090; font-size:14px;">
+                    Envie um arquivo Excel que contenha a aba <b style="color:#8899B0;">A.Propostas</b>
+                    para visualizar o acompanhamento das propostas de redução BSW.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("### Filtros")
+            fcol1, fcol2 = st.columns(2)
+            plantas_disp = sorted(df_propostas['_PLANTA'].unique().tolist())
+            fontes_disp = sorted(df_propostas['_FONTE'].unique().tolist())
+
+            with fcol1:
+                sel_plantas = st.multiselect("Planta Delga:", plantas_disp, default=plantas_disp, key="prop_planta")
+            with fcol2:
+                sel_fontes = st.multiselect("Fonte:", fontes_disp, default=fontes_disp, key="prop_fonte")
+
+            df_f = df_propostas[
+                df_propostas['_PLANTA'].isin(sel_plantas) & df_propostas['_FONTE'].isin(sel_fontes)
+            ].copy()
+
+            st.markdown("  ", unsafe_allow_html=True)
+
+            total_prop = len(df_f)
+            enviadas = int(df_f['_PASSADO'].str.contains('SIM', na=False).sum())
+            concluidas = int((df_f['_PCT'] == 100).sum())
+            reducao_total = float(df_f['_REDUCAO'].sum())
+            pct_medio = float(df_f['_PCT'].mean()) if total_prop else 0
+
+            pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+            with pc1:
+                st.metric("Total de Propostas", f"{total_prop:,}".replace(",", "."))
+            with pc2:
+                st.metric("Enviadas à Usina", f"{enviadas:,}".replace(",", "."))
+            with pc3:
+                st.metric("Concluídas (100%)", f"{concluidas:,}".replace(",", "."))
+            with pc4:
+                st.metric("Progresso Médio", f"{pct_medio:.0f}%")
+            with pc5:
+                st.metric("Redução Potencial Total", f"R$ {reducao_total:,.0f}".replace(",", "."))
+
+            st.markdown("  ", unsafe_allow_html=True)
+
+            if total_prop == 0:
+                st.info("Nenhuma proposta encontrada para os filtros selecionados.")
+            else:
+                fig_prop_prog = create_propostas_progress_chart(df_f)
+                if fig_prop_prog is not None:
+                    render_chart(fig_prop_prog)
+
+                st.markdown("### Linha do Tempo por Proposta")
+                st.markdown(
+                    '<p style="color:#5A7090; font-size:12px; margin-top:-8px;">'
+                    'Cada bolinha representa uma das 7 etapas do processo. '
+                    '<span style="color:#4DA3FF;">●</span> concluída &nbsp; '
+                    '<span style="color:#00E676;">●</span> não se aplica &nbsp; '
+                    '<span style="color:#FFB800;">○</span> pendente &nbsp; '
+                    '<span style="color:#4DA3FF;">○</span> prevista (data futura) &nbsp; '
+                    '<span style="color:#26344E;">○</span> não iniciada'
+                    '</p>',
+                    unsafe_allow_html=True,
+                )
+
+                # Ordena: planta na ordem padrão Delga primeiro, depois alfabética
+                ordem_preferida = ['FERRAZ', 'DIADEMA', 'JARINU', 'SUL']
+                plantas_ordenadas = sorted(
+                    df_f['_PLANTA'].unique().tolist(),
+                    key=lambda p: (ordem_preferida.index(p) if p in ordem_preferida else 99, p)
+                )
+
+                full_html = ""
+                for planta in plantas_ordenadas:
+                    df_grupo = df_f[df_f['_PLANTA'] == planta].sort_values('_PCT', ascending=True)
+                    full_html += render_acompanhamento_block(planta, df_grupo)
+
+                st.markdown(full_html, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
