@@ -93,6 +93,53 @@ st.markdown("""
     span[data-baseweb="tag"] span { color: #1400FF !important; }
     span[data-baseweb="tag"] svg { fill: #1400FF !important; }
 
+    /* ===== Inputs do BaseWeb (senha, texto) — tema claro ===== */
+    div[data-baseweb="input"], div[data-baseweb="base-input"] {
+        background-color: #FFFFFF !important;
+        border-color: #E2E6F0 !important;
+    }
+    div[data-baseweb="input"] input {
+        background-color: #FFFFFF !important;
+        color: #1F2937 !important;
+        -webkit-text-fill-color: #1F2937 !important;
+    }
+    div[data-baseweb="input"] svg { fill: #94A3B8 !important; }
+
+    /* ===== Expander (Área do Administrador) — tema claro ===== */
+    section[data-testid="stSidebar"] details {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E6F0 !important;
+        border-radius: 10px !important;
+        overflow: hidden;
+    }
+    section[data-testid="stSidebar"] summary {
+        background-color: #FFFFFF !important;
+        color: #1F2937 !important;
+    }
+    section[data-testid="stSidebar"] summary svg { fill: #475569 !important; }
+
+    /* ===== Uploader de arquivo — tema claro ===== */
+    div[data-testid="stFileUploaderDropzone"] {
+        background-color: #FFFFFF !important;
+        border: 2px dashed #E2E6F0 !important;
+    }
+    div[data-testid="stFileUploaderDropzone"] * { color: #475569 !important; fill: #94A3B8 !important; }
+    div[data-testid="stFileUploaderDropzone"] button {
+        background-color: #FFFFFF !important;
+        color: #1F2937 !important;
+        border: 1px solid #E2E6F0 !important;
+    }
+    div[data-testid="stFileUploaderFile"] {
+        background-color: #F4F6FB !important;
+        border: 1px solid #E2E6F0 !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stFileUploaderFile"] * { color: #1F2937 !important; fill: #475569 !important; }
+
+    /* ===== Texto branco garantido sobre fundos azul forte ===== */
+    .stTabs [aria-selected="true"] * { color: #FFFFFF !important; }
+    .stButton > button[kind="primary"] * { color: #FFFFFF !important; }
+
     /* ===== Aba Acompanhamento (timeline) ===== */
     .acomp-block { margin-bottom: 30px; }
     .acomp-header {
