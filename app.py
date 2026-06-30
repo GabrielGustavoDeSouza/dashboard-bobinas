@@ -600,18 +600,23 @@ def normalizar_texto_simples(valor, default='Desconhecida'):
 def classify_formalizacao(valor_formalizacao, passado_usina, data_envio_usina):
     """Classifica a etapa 'Formalização com Compras'.
     Regra: se a célula tiver uma data, usa essa data normalmente.
-    Se não tiver data, mas a proposta já foi 'PASSADO PARA USINA = SIM' e já
-    existe 'DATA ENVIO P/ USINA', consideramos a formalização automaticamente
-    OK (afinal, só foi enviado à usina depois de formalizado com compras).
-    Caso contrário, devolve exatamente o que está escrito na célula
-    (ex.: 'Data não informada.'), para sabermos há quanto tempo está parado."""
+    Se não tiver data própria, mas a etapa 'Envio à Usina' já tem uma data
+    (já foi enviado) OU está marcada como 'N/A' (não se aplica), consideramos
+    a formalização automaticamente OK — afinal só se envia à usina depois de
+    formalizar com compras, e se a etapa de envio nem se aplica, a
+    formalização também não se aplica. Nesses casos mostramos o que estiver
+    escrito na própria célula de formalização (mesmo que esteja vazia ou diga
+    algo como 'Data não informada.').
+    Caso a etapa de envio também não esteja resolvida, devolvemos o status
+    real da própria célula (ex.: pendente, com o texto escrito), para sabermos
+    há quanto tempo a proposta está parada na mão de Compras."""
     status_f, texto_f = classify_stage_value(valor_formalizacao)
     if status_f == 'done':
         return status_f, texto_f
 
-    status_e, texto_e = classify_stage_value(data_envio_usina)
-    if 'SIM' in str(passado_usina).upper() and status_e == 'done':
-        return 'done', f'OK (enviado à usina em {texto_e})'
+    status_e, _texto_e = classify_stage_value(data_envio_usina)
+    if status_e in ('done', 'na'):
+        return 'done', texto_f
 
     return status_f, texto_f
 
@@ -1029,14 +1034,20 @@ def create_propostas_progress_chart(df_propostas):
         y=[str(x) for x in dist.index],
         orientation='h',
         marker=dict(color=colors),
-        hovertemplate='%{y}  <b>%{x:.0f}%% concluído</b><extra></extra>',
+        text=[f"{v:.0f}%" for v in dist.values],
+        textposition='outside',
+        textfont=dict(color="#1F2937", size=12),
+        cliponaxis=False,
+        hovertemplate='%{y}  <b>%{x:.0f}% concluído</b><extra></extra>',
     )])
+    layout = dict(PLOTLY_LAYOUT)
+    layout['margin'] = dict(l=140, r=60, t=50, b=40)
     fig.update_layout(
-        **PLOTLY_LAYOUT,
+        **layout,
         title=dict(text="Progresso Médio das Propostas por Planta Delga", font=dict(size=16, color=COLORS["cyan"])),
-        height=max(300, len(dist) * 50),
-        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
-        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="% Concluído", range=[0, 100]),
+        height=max(320, len(dist) * 60),
+        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", automargin=True, tickfont=dict(size=13)),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="% Concluído", range=[0, 108]),
     )
     return fig
 
@@ -1378,18 +1389,23 @@ def main():
             st.markdown("  ", unsafe_allow_html=True)
 
             total_prop = len(df_f)
+            formalizadas = int(df_f['_STAGES'].apply(
+                lambda stages: bool(stages) and stages[0]['col'] == 'FORMALIZADO COM COMPRAS' and stages[0]['status'] == 'done'
+            ).sum())
             enviadas = int(df_f['_PASSADO'].str.contains('SIM', na=False).sum())
             concluidas = int((df_f['_PCT'] == 100).sum())
             pct_medio = float(df_f['_PCT'].mean()) if total_prop else 0
 
-            pc1, pc2, pc3, pc4 = st.columns(4)
+            pc1, pc2, pc3, pc4, pc5 = st.columns(5)
             with pc1:
                 st.metric("Total de Propostas", f"{total_prop:,}".replace(",", "."))
             with pc2:
-                st.metric("Enviadas à Usina", f"{enviadas:,}".replace(",", "."))
+                st.metric("Formalizado com Compras", f"{formalizadas:,}".replace(",", "."))
             with pc3:
-                st.metric("Concluídas (100%)", f"{concluidas:,}".replace(",", "."))
+                st.metric("Enviadas à Usina", f"{enviadas:,}".replace(",", "."))
             with pc4:
+                st.metric("Concluídas (100%)", f"{concluidas:,}".replace(",", "."))
+            with pc5:
                 st.metric("Progresso Médio", f"{pct_medio:.0f}%")
 
             st.markdown("  ", unsafe_allow_html=True)
