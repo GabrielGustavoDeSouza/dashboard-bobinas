@@ -66,6 +66,32 @@ st.markdown("""
     .stButton > button[kind="primary"] { background-color: #1400FF !important; border: none; }
     .stButton > button[kind="primary"]:hover { background-color: #2010FF !important; }
 
+    /* ===== Selectbox / Multiselect (componentes BaseWeb) ===== */
+    .stSelectbox label, .stMultiSelect label { color: #475569 !important; font-weight: 600 !important; }
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E6F0 !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+    }
+    div[data-baseweb="select"] * { color: #1F2937 !important; }
+    div[data-baseweb="select"] svg { fill: #94A3B8 !important; }
+    div[data-baseweb="popover"] div[data-baseweb="menu"],
+    ul[data-baseweb="menu"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E6F0 !important;
+    }
+    li[role="option"] { background-color: #FFFFFF !important; color: #1F2937 !important; }
+    li[role="option"]:hover, li[aria-selected="true"] { background-color: #EEF1FB !important; }
+    span[data-baseweb="tag"] {
+        background-color: #E6ECFD !important;
+        color: #1400FF !important;
+        border: 1px solid #CBD8FB !important;
+        border-radius: 6px !important;
+    }
+    span[data-baseweb="tag"] span { color: #1400FF !important; }
+    span[data-baseweb="tag"] svg { fill: #1400FF !important; }
+
     /* ===== Aba Acompanhamento (timeline) ===== */
     .acomp-block { margin-bottom: 30px; }
     .acomp-header {
@@ -352,7 +378,10 @@ def smart_read_propostas(excel_bytes):
             return None
         header_row = find_header_row(excel_bytes, sheet_name, ['CÓDIGO DELGA', 'CODIGO DELGA'])
         excel_bytes.seek(0)
-        df = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=header_row)
+        df = pd.read_excel(
+            excel_bytes, sheet_name=sheet_name, header=header_row,
+            keep_default_na=False, na_values=['']
+        )
         return df
     except Exception:
         return None
