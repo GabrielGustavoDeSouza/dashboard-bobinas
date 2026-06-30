@@ -67,51 +67,51 @@ st.markdown("""
     .stButton > button[kind="primary"]:hover { background-color: #2010FF !important; }
 
     /* ===== Aba Acompanhamento (timeline) ===== */
-    .acomp-block { margin-bottom: 26px; }
+    .acomp-block { margin-bottom: 30px; }
     .acomp-header {
         display:flex; align-items:center; justify-content:space-between;
-        padding:12px 16px; background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
+        padding:14px 18px; background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
         border:1px solid #1A2744; border-radius:10px 10px 0 0;
     }
-    .acomp-header-title { display:flex; align-items:center; gap:10px; }
-    .acomp-dot { width:13px; height:13px; border-radius:4px; flex-shrink:0; }
-    .acomp-header-title b { color:#FFFFFF; font-size:14px; letter-spacing:.3px; }
-    .acomp-header-sub { color:#5A7090; font-size:11px; }
-    .acomp-header-stats { display:flex; gap:18px; }
+    .acomp-header-title { display:flex; align-items:center; gap:12px; }
+    .acomp-dot { width:14px; height:14px; border-radius:4px; flex-shrink:0; }
+    .acomp-header-title b { color:#FFFFFF; font-size:15px; letter-spacing:.3px; }
+    .acomp-header-sub { color:#5A7090; font-size:12px; }
+    .acomp-header-stats { display:flex; gap:24px; }
     .acomp-stat { text-align:right; }
-    .acomp-stat-val { color:#ECEFF1; font-weight:700; font-size:15px; }
-    .acomp-stat-lbl { color:#5A7090; font-size:9px; text-transform:uppercase; letter-spacing:.5px; }
+    .acomp-stat-val { color:#ECEFF1; font-weight:700; font-size:17px; }
+    .acomp-stat-lbl { color:#5A7090; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
     .acomp-rows { border:1px solid #1A2744; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
 
-    .tl-row { display:flex; align-items:center; padding:14px 18px; border-bottom:1px solid #16213a; gap:18px; }
+    .tl-row { display:flex; align-items:center; padding:20px 20px 34px 20px; border-bottom:1px solid #16213a; gap:24px; }
     .tl-row:last-child { border-bottom:none; }
     .tl-row:hover { background:#0F1A2E; }
 
-    .tl-info { width:240px; flex-shrink:0; }
-    .tl-code { color:#ECEFF1; font-weight:700; font-size:13px; }
-    .tl-desc { color:#5A7090; font-size:10.5px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .tl-meta { color:#3F5575; font-size:10px; margin-top:4px; }
+    .tl-info { width:260px; flex-shrink:0; }
+    .tl-code { color:#ECEFF1; font-weight:700; font-size:14px; }
+    .tl-desc { color:#7C90AC; font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-meta { color:#4E6788; font-size:11px; margin-top:5px; }
     .tl-badge {
-        display:inline-block; font-size:9.5px; padding:3px 9px; border-radius:20px;
-        margin-top:6px; font-weight:700; letter-spacing:.3px;
+        display:inline-block; font-size:10.5px; padding:3px 10px; border-radius:20px;
+        margin-top:8px; font-weight:700; letter-spacing:.3px;
     }
 
-    .tl-track { flex:1; position:relative; height:50px; min-width:320px; }
-    .tl-line-bg { position:absolute; top:17px; left:10px; right:10px; height:3px; background:#1A2744; border-radius:2px; }
-    .tl-line-fill { position:absolute; top:17px; left:10px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
+    .tl-track { flex:1; position:relative; height:60px; min-width:480px; }
+    .tl-line-bg { position:absolute; top:11px; left:11px; right:11px; height:3px; background:#1A2744; border-radius:2px; }
+    .tl-line-fill { position:absolute; top:11px; left:11px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
     .tl-nodes { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:space-between; }
-    .tl-node { display:flex; flex-direction:column; align-items:center; width:18px; position:relative; }
-    .tl-dot { width:18px; height:18px; border-radius:50%; border:2.5px solid #1A2744; background:#0C1425; z-index:1; box-sizing:border-box; }
+    .tl-node { display:flex; flex-direction:column; align-items:center; width:22px; position:relative; }
+    .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #1A2744; background:#0C1425; z-index:1; box-sizing:border-box; }
     .tl-dot.done { background:#1400FF; border-color:#1400FF; }
     .tl-dot.na { background:#00E676; border-color:#00E676; }
     .tl-dot.planned { background:#0C1425; border-color:#4DA3FF; }
     .tl-dot.pending { background:#0C1425; border-color:#FFB800; }
     .tl-dot.empty { background:#0C1425; border-color:#26344E; }
-    .tl-label { font-size:8.5px; color:#46608A; margin-top:5px; text-align:center; width:74px; transform:translateX(-28px); line-height:1.25; }
+    .tl-label { font-size:10.5px; color:#6A82A6; margin-top:8px; text-align:center; width:96px; transform:translateX(-37px); line-height:1.3; }
 
-    .tl-pct { width:80px; text-align:right; flex-shrink:0; }
-    .tl-pct-num { font-size:19px; font-weight:800; color:#ECEFF1; }
-    .tl-pct-label { font-size:9.5px; color:#5A7090; }
+    .tl-pct { width:90px; text-align:right; flex-shrink:0; }
+    .tl-pct-num { font-size:22px; font-weight:800; color:#ECEFF1; }
+    .tl-pct-label { font-size:10.5px; color:#5A7090; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -609,25 +609,28 @@ def render_timeline_row_html(row):
     fonte_txt = html_lib.escape(str(row['_FONTE']))
     meta_txt = " · ".join([t for t in [fonte_txt, reducao_txt] if t])
 
-    row_html = f"""
-    <div class="tl-row">
-        <div class="tl-info">
-            <div class="tl-code">{codigo}</div>
-            <div class="tl-desc">{desc}</div>
-            <div class="tl-meta">{meta_txt}</div>
-            <span class="tl-badge" style="background:{badge_color}22; color:{badge_color}; border:1px solid {badge_color}55;">{badge_label}</span>
-        </div>
-        <div class="tl-track">
-            <div class="tl-line-bg"></div>
-            <div class="tl-line-fill" style="width:{pct}%;"></div>
-            <div class="tl-nodes">{''.join(nodes_html)}</div>
-        </div>
-        <div class="tl-pct">
-            <div class="tl-pct-num">{pct}%</div>
-            <div class="tl-pct-label">concluído</div>
-        </div>
-    </div>
-    """
+    # IMPORTANTE: sem indentação/quebras de linha "soltas" no HTML — texto
+    # indentado com 4+ espaços é interpretado pelo Markdown do Streamlit
+    # como bloco de código, quebrando a renderização.
+    row_html = (
+        '<div class="tl-row">'
+        '<div class="tl-info">'
+        f'<div class="tl-code">{codigo}</div>'
+        f'<div class="tl-desc">{desc}</div>'
+        f'<div class="tl-meta">{meta_txt}</div>'
+        f'<span class="tl-badge" style="background:{badge_color}22; color:{badge_color}; border:1px solid {badge_color}55;">{badge_label}</span>'
+        '</div>'
+        '<div class="tl-track">'
+        '<div class="tl-line-bg"></div>'
+        f'<div class="tl-line-fill" style="width:{pct}%;"></div>'
+        f'<div class="tl-nodes">{"".join(nodes_html)}</div>'
+        '</div>'
+        '<div class="tl-pct">'
+        f'<div class="tl-pct-num">{pct}%</div>'
+        '<div class="tl-pct-label">concluído</div>'
+        '</div>'
+        '</div>'
+    )
     return row_html
 
 
@@ -639,30 +642,31 @@ def render_acompanhamento_block(planta, df_grupo):
 
     rows_html = ''.join(render_timeline_row_html(r) for _, r in df_grupo.iterrows())
 
-    block_html = f"""
-    <div class="acomp-block">
-        <div class="acomp-header">
-            <div class="acomp-header-title">
-                <div class="acomp-dot" style="background:{color};"></div>
-                <div>
-                    <b>{html_lib.escape(str(planta))}</b><br/>
-                    <span class="acomp-header-sub">{n_itens} propostas</span>
-                </div>
-            </div>
-            <div class="acomp-header-stats">
-                <div class="acomp-stat">
-                    <div class="acomp-stat-val">{avg_pct:.0f}%</div>
-                    <div class="acomp-stat-lbl">Progresso Médio</div>
-                </div>
-                <div class="acomp-stat">
-                    <div class="acomp-stat-val">{n_concluidos}</div>
-                    <div class="acomp-stat-lbl">Concluídas</div>
-                </div>
-            </div>
-        </div>
-        <div class="acomp-rows">{rows_html}</div>
-    </div>
-    """
+    # Sem indentação/quebras de linha soltas (ver nota em render_timeline_row_html).
+    block_html = (
+        '<div class="acomp-block">'
+        '<div class="acomp-header">'
+        '<div class="acomp-header-title">'
+        f'<div class="acomp-dot" style="background:{color};"></div>'
+        '<div>'
+        f'<b>{html_lib.escape(str(planta))}</b><br/>'
+        f'<span class="acomp-header-sub">{n_itens} propostas</span>'
+        '</div>'
+        '</div>'
+        '<div class="acomp-header-stats">'
+        '<div class="acomp-stat">'
+        f'<div class="acomp-stat-val">{avg_pct:.0f}%</div>'
+        '<div class="acomp-stat-lbl">Progresso Médio</div>'
+        '</div>'
+        '<div class="acomp-stat">'
+        f'<div class="acomp-stat-val">{n_concluidos}</div>'
+        '<div class="acomp-stat-lbl">Concluídas</div>'
+        '</div>'
+        '</div>'
+        '</div>'
+        f'<div class="acomp-rows">{rows_html}</div>'
+        '</div>'
+    )
     return block_html
 
 
