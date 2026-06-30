@@ -136,6 +136,11 @@ st.markdown("""
     }
     div[data-testid="stFileUploaderFile"] * { color: #1F2937 !important; fill: #475569 !important; }
 
+    /* ===== Toggle (botões on/off de filtro) ===== */
+    div[data-testid="stToggle"] label p { color: #475569 !important; font-weight: 600 !important; font-size: 13.5px !important; }
+    div[role="switch"] { background-color: #CBD5E1 !important; }
+    div[role="switch"][aria-checked="true"] { background-color: #1400FF !important; }
+
     /* ===== Texto branco garantido sobre fundos azul forte ===== */
     .stTabs [aria-selected="true"] * { color: #FFFFFF !important; }
     .stButton > button[kind="primary"] * { color: #FFFFFF !important; }
@@ -636,6 +641,10 @@ def process_propostas(df_raw):
     df = df[df[col_codigo].notna() & (df[col_codigo].astype(str).str.strip() != '')].copy()
     if len(df) == 0:
         return None
+
+    # Evita contagens duplicadas quando o mesmo Código Delga aparece mais de
+    # uma vez na planilha (mantém a primeira ocorrência).
+    df = df.drop_duplicates(subset=[col_codigo], keep='first')
 
     df = df.rename(columns={col_codigo: 'CÓDIGO DELGA'})
 
@@ -1382,9 +1391,33 @@ def main():
             with fcol2:
                 sel_fontes = st.multiselect("Fonte:", fontes_disp, default=fontes_disp, key="prop_fonte")
 
+            tcol1, tcol2, _tcol3 = st.columns([1, 1, 2])
+            with tcol1:
+                only_pend_compras = st.toggle(
+                    "Pendente Formalização c/ Compras",
+                    key="toggle_pendente_compras",
+                    help="Mostra apenas propostas ainda não formalizadas com Compras.",
+                )
+            with tcol2:
+                only_pend_usina = st.toggle(
+                    "Pendente Envio à Usina",
+                    key="toggle_pendente_usina",
+                    help="Mostra apenas propostas ainda não enviadas à usina.",
+                )
+
             df_f = df_propostas[
                 df_propostas['_PLANTA'].isin(sel_plantas) & df_propostas['_FONTE'].isin(sel_fontes)
             ].copy()
+
+            if only_pend_compras:
+                df_f = df_f[df_f['_STAGES'].apply(
+                    lambda stages: bool(stages) and stages[0]['col'] == 'FORMALIZADO COM COMPRAS' and stages[0]['status'] != 'done'
+                )]
+            if only_pend_usina:
+                df_f = df_f[df_f['_STAGES'].apply(
+                    lambda stages: bool(stages) and len(stages) > 1
+                    and stages[1]['col'] == 'DATA ENVIO P/ USINA' and stages[1]['status'] not in ('done', 'na')
+                )]
 
             st.markdown("  ", unsafe_allow_html=True)
 
