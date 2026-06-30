@@ -51,7 +51,8 @@ st.markdown("""
         gap: 4px; background-color: #F8FAFD; border-radius: 10px; padding: 4px; border: 1px solid #E2E6F0;
     }
     .stTabs [data-baseweb="tab"] { color: #64748B; border-radius: 8px; font-weight: 500; }
-    .stTabs [aria-selected="true"] { background-color: #1400FF !important; color: #FFFFFF !important; }
+    .stTabs [aria-selected="true"] { background-color: #4D6BFF !important; color: #FFFFFF !important; box-shadow: none !important; }
+    .stTabs [data-baseweb="tab-highlight"] { background-color: #4D6BFF !important; }
     h1, h2, h3 { color: #1F2937 !important; font-family: 'Inter', sans-serif; font-weight: 700; }
     h4, h5, h6 { color: #64748B !important; font-family: 'Inter', sans-serif; font-weight: 600; }
     p, span, li { color: #475569; }
@@ -129,7 +130,7 @@ st.markdown("""
     .tl-node { display:flex; flex-direction:column; align-items:center; width:1px; position:relative; }
     .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #E2E6F0; background:#F8FAFD; z-index:1; box-sizing:border-box; flex-shrink:0; transform:translateX(-11px); }
     .tl-dot.done { background:#1400FF; border-color:#1400FF; }
-    .tl-dot.na { background:#00C853; border-color:#00C853; }
+    .tl-dot.na { background:#1400FF; border-color:#1400FF; }
     .tl-dot.planned { background:#F8FAFD; border-color:#4DA3FF; }
     .tl-dot.pending { background:#F8FAFD; border-color:#FFB800; }
     .tl-dot.empty { background:#F8FAFD; border-color:#D1D7E3; }
@@ -202,7 +203,7 @@ STAGE_DEFS = [
 
 STAGE_STATUS_COLOR = {
     "done": "#1400FF",
-    "na": "#00E676",
+    "na": "#1400FF",
     "planned": "#4DA3FF",
     "pending": "#FFB800",
     "empty": "#D1D7E3",
@@ -1295,8 +1296,7 @@ def main():
                 st.markdown(
                     '<p style="color:#64748B; font-size:12px; margin-top:-8px;">'
                     'Cada bolinha representa uma das 7 etapas do processo. '
-                    '<span style="color:#4DA3FF;">●</span> concluída &nbsp; '
-                    '<span style="color:#00E676;">●</span> não se aplica &nbsp; '
+                    '<span style="color:#1400FF;">●</span> concluída / não se aplica &nbsp; '
                     '<span style="color:#FFB800;">○</span> pendente &nbsp; '
                     '<span style="color:#4DA3FF;">○</span> prevista (data futura) &nbsp; '
                     '<span style="color:#D1D7E3;">○</span> não iniciada'
