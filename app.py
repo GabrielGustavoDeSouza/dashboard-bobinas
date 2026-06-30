@@ -31,38 +31,38 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' );
 
-    .stApp { background-color: #080E1A; font-family: 'Inter', sans-serif; }
-    header[data-testid="stHeader"] { background-color: #080E1A; }
-    section[data-testid="stSidebar"] { background-color: #0C1425; border-right: 1px solid #1A2744; }
+    .stApp { background-color: #F4F6FB; font-family: 'Inter', sans-serif; }
+    header[data-testid="stHeader"] { background-color: #F4F6FB; }
+    section[data-testid="stSidebar"] { background-color: #F8FAFD; border-right: 1px solid #E2E6F0; }
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
-        border: 1px solid #1A2744;
+        background: linear-gradient(135deg, #FFFFFF 0%, #EEF1F8 100%);
+        border: 1px solid #E2E6F0;
         border-radius: 12px;
         padding: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 10px rgba(15,23,42,0.06);
     }
-    div[data-testid="stMetric"] label { color: #8899B0 !important; font-weight: 500 !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.5px; }
+    div[data-testid="stMetric"] label { color: #64748B !important; font-weight: 500 !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.5px; }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        color: #FFFFFF !important;
+        color: #1F2937 !important;
         font-family: 'Inter', sans-serif;
         font-weight: 700;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px; background-color: #0C1425; border-radius: 10px; padding: 4px; border: 1px solid #1A2744;
+        gap: 4px; background-color: #F8FAFD; border-radius: 10px; padding: 4px; border: 1px solid #E2E6F0;
     }
-    .stTabs [data-baseweb="tab"] { color: #8899B0; border-radius: 8px; font-weight: 500; }
+    .stTabs [data-baseweb="tab"] { color: #64748B; border-radius: 8px; font-weight: 500; }
     .stTabs [aria-selected="true"] { background-color: #1400FF !important; color: #FFFFFF !important; }
-    h1, h2, h3 { color: #FFFFFF !important; font-family: 'Inter', sans-serif; font-weight: 700; }
-    h4, h5, h6 { color: #8899B0 !important; font-family: 'Inter', sans-serif; font-weight: 600; }
-    p, span, li { color: #B8C8DC; }
-    .stDataFrame { border: 1px solid #1A2744; border-radius: 10px; overflow: hidden; }
-    hr { border-color: #1A2744; }
+    h1, h2, h3 { color: #1F2937 !important; font-family: 'Inter', sans-serif; font-weight: 700; }
+    h4, h5, h6 { color: #64748B !important; font-family: 'Inter', sans-serif; font-weight: 600; }
+    p, span, li { color: #475569; }
+    .stDataFrame { border: 1px solid #E2E6F0; border-radius: 10px; overflow: hidden; }
+    hr { border-color: #E2E6F0; }
     div[data-testid="stFileUploader"] {
-        background-color: #0F1A2E; border: 2px dashed #1A2744; border-radius: 12px; padding: 16px;
+        background-color: #FFFFFF; border: 2px dashed #E2E6F0; border-radius: 12px; padding: 16px;
     }
     div[data-testid="stFileUploader"]:hover { border-color: #1400FF; }
-    div[data-testid="stSidebar"] .stRadio label { color: #8899B0 !important; }
-    .stSelectbox label { color: #8899B0 !important; }
+    div[data-testid="stSidebar"] .stRadio label { color: #64748B !important; }
+    .stSelectbox label { color: #64748B !important; }
     .stButton > button[kind="primary"] { background-color: #1400FF !important; border: none; }
     .stButton > button[kind="primary"]:hover { background-color: #2010FF !important; }
 
@@ -70,48 +70,49 @@ st.markdown("""
     .acomp-block { margin-bottom: 30px; }
     .acomp-header {
         display:flex; align-items:center; justify-content:space-between;
-        padding:14px 18px; background: linear-gradient(135deg, #0F1A2E 0%, #132040 100%);
-        border:1px solid #1A2744; border-radius:10px 10px 0 0;
+        padding:14px 18px; background: linear-gradient(135deg, #FFFFFF 0%, #EEF1F8 100%);
+        border:1px solid #E2E6F0; border-radius:10px 10px 0 0;
     }
     .acomp-header-title { display:flex; align-items:center; gap:12px; }
     .acomp-dot { width:14px; height:14px; border-radius:4px; flex-shrink:0; }
-    .acomp-header-title b { color:#FFFFFF; font-size:15px; letter-spacing:.3px; }
-    .acomp-header-sub { color:#5A7090; font-size:12px; }
+    .acomp-header-title b { color:#1F2937; font-size:15px; letter-spacing:.3px; }
+    .acomp-header-sub { color:#64748B; font-size:12px; }
     .acomp-header-stats { display:flex; gap:24px; }
     .acomp-stat { text-align:right; }
-    .acomp-stat-val { color:#ECEFF1; font-weight:700; font-size:17px; }
-    .acomp-stat-lbl { color:#5A7090; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
-    .acomp-rows { border:1px solid #1A2744; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
+    .acomp-stat-val { color:#1F2937; font-weight:700; font-size:17px; }
+    .acomp-stat-lbl { color:#64748B; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+    .acomp-rows { border:1px solid #E2E6F0; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
 
-    .tl-row { display:flex; align-items:center; padding:20px 20px 34px 20px; border-bottom:1px solid #16213a; gap:24px; }
+    .tl-row { display:flex; align-items:center; padding:22px 20px 40px 20px; border-bottom:1px solid #EDF0F6; gap:24px; }
     .tl-row:last-child { border-bottom:none; }
-    .tl-row:hover { background:#0F1A2E; }
+    .tl-row:hover { background:#F8FAFD; }
 
     .tl-info { width:260px; flex-shrink:0; }
-    .tl-code { color:#ECEFF1; font-weight:700; font-size:14px; }
-    .tl-desc { color:#7C90AC; font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .tl-meta { color:#4E6788; font-size:11px; margin-top:5px; }
+    .tl-code { color:#1F2937; font-weight:700; font-size:14px; }
+    .tl-desc { color:#64748B; font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-meta { color:#64748B; font-size:11px; margin-top:5px; }
     .tl-badge {
         display:inline-block; font-size:10.5px; padding:3px 10px; border-radius:20px;
         margin-top:8px; font-weight:700; letter-spacing:.3px;
     }
 
-    .tl-track { flex:1; position:relative; height:60px; min-width:480px; }
-    .tl-line-bg { position:absolute; top:11px; left:11px; right:11px; height:3px; background:#1A2744; border-radius:2px; }
+    .tl-track { flex:1; position:relative; height:78px; min-width:520px; }
+    .tl-line-bg { position:absolute; top:11px; left:11px; right:11px; height:3px; background:#E2E6F0; border-radius:2px; }
     .tl-line-fill { position:absolute; top:11px; left:11px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
     .tl-nodes { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:space-between; }
-    .tl-node { display:flex; flex-direction:column; align-items:center; width:22px; position:relative; }
-    .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #1A2744; background:#0C1425; z-index:1; box-sizing:border-box; }
+    .tl-node { display:flex; flex-direction:column; align-items:center; width:1px; position:relative; }
+    .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #E2E6F0; background:#F8FAFD; z-index:1; box-sizing:border-box; flex-shrink:0; transform:translateX(-11px); }
     .tl-dot.done { background:#1400FF; border-color:#1400FF; }
-    .tl-dot.na { background:#00E676; border-color:#00E676; }
-    .tl-dot.planned { background:#0C1425; border-color:#4DA3FF; }
-    .tl-dot.pending { background:#0C1425; border-color:#FFB800; }
-    .tl-dot.empty { background:#0C1425; border-color:#26344E; }
-    .tl-label { font-size:10.5px; color:#6A82A6; margin-top:8px; text-align:center; width:96px; transform:translateX(-37px); line-height:1.3; }
+    .tl-dot.na { background:#00C853; border-color:#00C853; }
+    .tl-dot.planned { background:#F8FAFD; border-color:#4DA3FF; }
+    .tl-dot.pending { background:#F8FAFD; border-color:#FFB800; }
+    .tl-dot.empty { background:#F8FAFD; border-color:#D1D7E3; }
+    .tl-label { font-size:10.5px; color:#1F2937; font-weight:600; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
+    .tl-value { font-size:10px; color:#8893A6; margin-top:3px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.25; }
 
     .tl-pct { width:90px; text-align:right; flex-shrink:0; }
-    .tl-pct-num { font-size:22px; font-weight:800; color:#ECEFF1; }
-    .tl-pct-label { font-size:10.5px; color:#5A7090; }
+    .tl-pct-num { font-size:22px; font-weight:800; color:#1F2937; }
+    .tl-pct-label { font-size:10.5px; color:#64748B; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -129,8 +130,8 @@ COLORS = {
     "cyan": "#4DA3FF", "amber": "#FFB800", "emerald": "#00E676",
     "coral": "#FF6B6B", "purple": "#A78BFA", "teal": "#4DD0E1",
     "blue_delga": "#1400FF", "blue_light": "#4DA3FF",
-    "bg_card": "#0F1A2E", "bg_dark": "#0C1425",
-    "border": "#1A2744", "text_light": "#8899B0", "text_white": "#ECEFF1",
+    "bg_card": "#FFFFFF", "bg_dark": "#F8FAFD",
+    "border": "#E2E6F0", "text_light": "#64748B", "text_white": "#1F2937",
 }
 
 CHART_COLORS = [
@@ -140,13 +141,13 @@ CHART_COLORS = [
 ]
 
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor="#0F1A2E",
-    plot_bgcolor="#0F1A2E",
-    font=dict(color="#8899B0", family="Inter, Arial"),
+    paper_bgcolor="#FFFFFF",
+    plot_bgcolor="#FFFFFF",
+    font=dict(color="#475569", family="Inter, Arial"),
     margin=dict(l=40, r=40, t=50, b=40),
     legend=dict(
-        bgcolor="rgba(15,26,46,0.9)", bordercolor="#1A2744",
-        borderwidth=1, font=dict(color="#8899B0"),
+        bgcolor="rgba(255,255,255,0.95)", bordercolor="#E2E6F0",
+        borderwidth=1, font=dict(color="#64748B"),
     ),
 )
 
@@ -178,7 +179,7 @@ STAGE_STATUS_COLOR = {
     "na": "#00E676",
     "planned": "#4DA3FF",
     "pending": "#FFB800",
-    "empty": "#26344E",
+    "empty": "#D1D7E3",
 }
 
 
@@ -596,18 +597,18 @@ def render_timeline_row_html(row):
     for st_info in row['_STAGES']:
         status = st_info['status']
         label = html_lib.escape(st_info['label'])
-        texto = html_lib.escape(st_info['texto']) if st_info['texto'] else 'Não iniciado'
-        tooltip = f"{label}: {texto}"
+        texto_raw = st_info['texto'] if st_info['texto'] else '—'
+        texto = html_lib.escape(texto_raw)
+        tooltip = f"{label}: {texto_raw}"
         nodes_html.append(
             f'<div class="tl-node" title="{tooltip}">'
             f'<div class="tl-dot {status}"></div>'
             f'<div class="tl-label">{label}</div>'
+            f'<div class="tl-value">{texto}</div>'
             f'</div>'
         )
 
-    reducao_txt = f"R$ {row['_REDUCAO']:,.0f}".replace(",", ".") if row['_REDUCAO'] else ""
     fonte_txt = html_lib.escape(str(row['_FONTE']))
-    meta_txt = " · ".join([t for t in [fonte_txt, reducao_txt] if t])
 
     # IMPORTANTE: sem indentação/quebras de linha "soltas" no HTML — texto
     # indentado com 4+ espaços é interpretado pelo Markdown do Streamlit
@@ -617,7 +618,7 @@ def render_timeline_row_html(row):
         '<div class="tl-info">'
         f'<div class="tl-code">{codigo}</div>'
         f'<div class="tl-desc">{desc}</div>'
-        f'<div class="tl-meta">{meta_txt}</div>'
+        f'<div class="tl-meta">{fonte_txt}</div>'
         f'<span class="tl-badge" style="background:{badge_color}22; color:{badge_color}; border:1px solid {badge_color}55;">{badge_label}</span>'
         '</div>'
         '<div class="tl-track">'
@@ -696,8 +697,8 @@ def create_area_chart(df, col_names):
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Evolução da Necessidade Mensal (ton)", font=dict(size=16, color=COLORS["cyan"])),
-        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        yaxis=dict(title="Toneladas", gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
         height=400,
     )
     return fig
@@ -718,7 +719,7 @@ def create_unidade_pie_chart(df, col_media):
         hole=0.45,
         marker=dict(colors=colors),
         textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
+        textfont=dict(size=12, color="#1F2937"),
         hovertemplate='%{label}  <b>%{value:,.1f} ton</b>  %{percent}<extra></extra>',
     )])
     fig.update_layout(
@@ -755,7 +756,7 @@ def create_tipo_pie_chart(df, col_media):
         hole=0.45,
         marker=dict(colors=cores_fatias),
         textinfo='percent+label',
-        textfont=dict(size=12, color="#ECEFF1"),
+        textfont=dict(size=12, color="#1F2937"),
         hovertemplate='%{label}<b>%{value:,.1f} ton</b> %{percent}<extra></extra>',
     )])
     fig.update_layout(
@@ -791,8 +792,8 @@ def create_thickness_chart(df, col_media):
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text="Distribuição por Faixa de Espessura (mm)", font=dict(size=16, color=COLORS["cyan"])),
-        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(title="Espessura (mm)", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        yaxis=dict(title="Toneladas", gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(title="Espessura (mm)", gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
         height=400,
     )
     return fig
@@ -823,8 +824,8 @@ def create_progress_chart(df_unidades):
         **PLOTLY_LAYOUT,
         title=dict(text="Peso Total vs Analisado por Unidade", font=dict(size=16, color=COLORS["cyan"])),
         barmode='group',
-        yaxis=dict(title="Toneladas", gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
+        yaxis=dict(title="Toneladas", gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
         height=400,
     )
     return fig
@@ -846,8 +847,8 @@ def create_usinas_chart(df_usinas, top_n=15):
         **PLOTLY_LAYOUT,
         title=dict(text="Top Usinas por Peso (ton)", font=dict(size=16, color=COLORS["cyan"])),
         height=max(400, min(top_n, len(df_sorted)) * 32),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
+        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="Toneladas"),
     )
     return fig
 
@@ -868,8 +869,8 @@ def create_bar_chart(df, col_media, title, group_col, top_n=15, color=None):
         **PLOTLY_LAYOUT,
         title=dict(text=title, font=dict(size=16, color=COLORS["cyan"])),
         height=max(400, min(top_n, len(dist)) * 32),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
+        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="Toneladas"),
     )
     return fig
 
@@ -894,8 +895,8 @@ def create_unidade_bar_chart(df, col_media):
         **PLOTLY_LAYOUT,
         title=dict(text="Necessidade por Unidade Delga (ton)", font=dict(size=16, color=COLORS["cyan"])),
         height=350,
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="Toneladas"),
+        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="Toneladas"),
     )
     return fig
 
@@ -916,8 +917,8 @@ def create_propostas_progress_chart(df_propostas):
         **PLOTLY_LAYOUT,
         title=dict(text="Progresso Médio das Propostas por Planta Delga", font=dict(size=16, color=COLORS["cyan"])),
         height=max(300, len(dist) * 50),
-        yaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F"),
-        xaxis=dict(gridcolor="#1E3A5F", zerolinecolor="#1E3A5F", title="% Concluído", range=[0, 100]),
+        yaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2"),
+        xaxis=dict(gridcolor="#E5E9F2", zerolinecolor="#E5E9F2", title="% Concluído", range=[0, 100]),
     )
     return fig
 
@@ -972,9 +973,9 @@ def main():
         st.image("logo_delga.png", use_container_width=True)
         st.markdown("""
         <div style="text-align:center; padding:8px 0 16px 0;">
-            <p style="color:#8899B0; font-size:11px; margin:0; text-transform:uppercase; letter-spacing:1.5px; font-weight:600;">Controle de Matéria-Prima</p>
+            <p style="color:#64748B; font-size:11px; margin:0; text-transform:uppercase; letter-spacing:1.5px; font-weight:600;">Controle de Matéria-Prima</p>
         </div>
-        <hr style="border-color:#1A2744; margin:0 0 16px 0;">
+        <hr style="border-color:#E2E6F0; margin:0 0 16px 0;">
         """, unsafe_allow_html=True)
 
         st.markdown("#### 🔐 Área do Administrador")
@@ -1009,29 +1010,29 @@ def main():
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">'
                 f'<div style="width:16px;height:16px;border-radius:4px;background:{cor};"></div>'
-                f'<span style="color:#B0BEC5;font-size:13px;">{unidade}</span></div>',
+                f'<span style="color:#64748B;font-size:13px;">{unidade}</span></div>',
                 unsafe_allow_html=True,
             )
 
         st.markdown("---")
         st.markdown("""
-        <div style="padding:10px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border-radius:10px; border:1px solid #1A2744; margin-top:8px;">
-            <p style="color:#5A7090; font-size:11px; margin:0; line-height:1.6;">
-                <b style="color:#8899B0;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
-                <b style="color:#8899B0;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
+        <div style="padding:10px; background:linear-gradient(135deg, #FFFFFF 0%, #EEF1F8 100%); border-radius:10px; border:1px solid #E2E6F0; margin-top:8px;">
+            <p style="color:#64748B; font-size:11px; margin:0; line-height:1.6;">
+                <b style="color:#64748B;">📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>
+                <b style="color:#64748B;">👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
     # HEADER
     st.markdown("""
-    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #1A2744;">
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #E2E6F0;">
         <div style="background:linear-gradient(135deg, #1400FF 0%, #0A00AA 100%); border-radius:12px; padding:14px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(20,0,255,0.3);">
             <span style="font-size:24px; color:white; font-weight:800; font-family:'Inter',sans-serif;">BSW</span>
         </div>
         <div>
-            <h1 style="margin:0; font-size:26px; color:#FFFFFF !important; font-weight:800; letter-spacing:-0.5px;">Controle de Matéria-Prima</h1>
-            <p style="margin:4px 0 0 0; color:#5A7090; font-size:12px; font-weight:500; letter-spacing:0.5px;">BOBINAS BSW — JAN A MAI / 2026 | GRUPO DELGA</p>
+            <h1 style="margin:0; font-size:26px; color:#1F2937 !important; font-weight:800; letter-spacing:-0.5px;">Controle de Matéria-Prima</h1>
+            <p style="margin:4px 0 0 0; color:#64748B; font-size:12px; font-weight:500; letter-spacing:0.5px;">BOBINAS BSW — JAN A MAI / 2026 | GRUPO DELGA</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1056,12 +1057,12 @@ def main():
 
     if df_raw is None:
         st.markdown("""
-        <div style="text-align:center; padding:80px 20px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border:2px dashed #1A2744; border-radius:16px; margin:40px auto; max-width:600px;">
+        <div style="text-align:center; padding:80px 20px; background:linear-gradient(135deg, #FFFFFF 0%, #EEF1F8 100%); border:2px dashed #E2E6F0; border-radius:16px; margin:40px auto; max-width:600px;">
             <span style="font-size:64px;">📊</span>
-            <h2 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
-            <p style="color:#5A7090; font-size:14px;">
+            <h2 style="color:#1F2937 !important; margin:16px 0 8px 0;">Aguardando Dados</h2>
+            <p style="color:#64748B; font-size:14px;">
                 Nenhum dado disponível ainda.<br><br>
-                <b style="color:#8899B0;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral
+                <b style="color:#64748B;">Administrador:</b> Use a área "Atualizar Dados" no painel lateral
                 para enviar o arquivo Excel pela primeira vez.
             </p>
         </div>
@@ -1078,7 +1079,7 @@ def main():
         st.stop()
 
     st.markdown(f"""
-    <p style="text-align:right; color:#546E7A; font-size:12px; font-family:Consolas,monospace;">
+    <p style="text-align:right; color:#64748B; font-size:12px; font-family:Consolas,monospace;">
         Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M')}
     </p>
     """, unsafe_allow_html=True)
@@ -1211,11 +1212,11 @@ def main():
     with tab3:
         if df_propostas is None or len(df_propostas) == 0:
             st.markdown("""
-            <div style="text-align:center; padding:60px 20px; background:linear-gradient(135deg, #0F1A2E 0%, #132040 100%); border:2px dashed #1A2744; border-radius:16px; margin:20px auto; max-width:600px;">
+            <div style="text-align:center; padding:60px 20px; background:linear-gradient(135deg, #FFFFFF 0%, #EEF1F8 100%); border:2px dashed #E2E6F0; border-radius:16px; margin:20px auto; max-width:600px;">
                 <span style="font-size:48px;">🛠️</span>
-                <h3 style="color:#FFFFFF !important; margin:16px 0 8px 0;">Aba "A.Propostas" não encontrada</h3>
-                <p style="color:#5A7090; font-size:14px;">
-                    Envie um arquivo Excel que contenha a aba <b style="color:#8899B0;">A.Propostas</b>
+                <h3 style="color:#1F2937 !important; margin:16px 0 8px 0;">Aba "A.Propostas" não encontrada</h3>
+                <p style="color:#64748B; font-size:14px;">
+                    Envie um arquivo Excel que contenha a aba <b style="color:#64748B;">A.Propostas</b>
                     para visualizar o acompanhamento das propostas de redução BSW.
                 </p>
             </div>
@@ -1240,10 +1241,9 @@ def main():
             total_prop = len(df_f)
             enviadas = int(df_f['_PASSADO'].str.contains('SIM', na=False).sum())
             concluidas = int((df_f['_PCT'] == 100).sum())
-            reducao_total = float(df_f['_REDUCAO'].sum())
             pct_medio = float(df_f['_PCT'].mean()) if total_prop else 0
 
-            pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+            pc1, pc2, pc3, pc4 = st.columns(4)
             with pc1:
                 st.metric("Total de Propostas", f"{total_prop:,}".replace(",", "."))
             with pc2:
@@ -1252,8 +1252,6 @@ def main():
                 st.metric("Concluídas (100%)", f"{concluidas:,}".replace(",", "."))
             with pc4:
                 st.metric("Progresso Médio", f"{pct_medio:.0f}%")
-            with pc5:
-                st.metric("Redução Potencial Total", f"R$ {reducao_total:,.0f}".replace(",", "."))
 
             st.markdown("  ", unsafe_allow_html=True)
 
@@ -1266,13 +1264,13 @@ def main():
 
                 st.markdown("### Linha do Tempo por Proposta")
                 st.markdown(
-                    '<p style="color:#5A7090; font-size:12px; margin-top:-8px;">'
+                    '<p style="color:#64748B; font-size:12px; margin-top:-8px;">'
                     'Cada bolinha representa uma das 7 etapas do processo. '
                     '<span style="color:#4DA3FF;">●</span> concluída &nbsp; '
                     '<span style="color:#00E676;">●</span> não se aplica &nbsp; '
                     '<span style="color:#FFB800;">○</span> pendente &nbsp; '
                     '<span style="color:#4DA3FF;">○</span> prevista (data futura) &nbsp; '
-                    '<span style="color:#26344E;">○</span> não iniciada'
+                    '<span style="color:#D1D7E3;">○</span> não iniciada'
                     '</p>',
                     unsafe_allow_html=True,
                 )
