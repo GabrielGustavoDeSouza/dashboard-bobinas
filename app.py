@@ -75,6 +75,7 @@ html,body,[class*="css"]{{font-family:'Inter',sans-serif;}}
 
 /* ── KPI CARDS ── */
 .kpi-wrap{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}}
+.kpi-6{{grid-template-columns:repeat(6,1fr);}}
 .kpi-card{{background:white;border-radius:12px;padding:18px 20px;
            border-left:4px solid {NAVY};
            box-shadow:0 1px 4px rgba(28,43,74,.06),0 4px 16px rgba(28,43,74,.04);
@@ -304,9 +305,9 @@ def extract_plantas(d):
         df_p = d.get(sh, pd.DataFrame())
         p2026 = safe(df_p.iloc[4,3]) if not df_p.empty else 0
         res.append(dict(nome=nome,sheet=sh,
-            meta=safe(df.iloc[21,col]),prev=safe(df.iloc[22,col]),
-            prev2026=p2026,val=safe(df.iloc[24,col]),
-            real=safe(df.iloc[25,col]),pct=safe(df.iloc[26,col])))
+            meta=safe(df.iloc[22,col]),prev=safe(df.iloc[23,col]),
+            prev2026=p2026,val=safe(df.iloc[25,col]),
+            real=safe(df.iloc[26,col]),pct=safe(df.iloc[27,col])))
     return res
 
 def extract_areas(d):
@@ -317,22 +318,24 @@ def extract_areas(d):
         df_a = d.get(sh, pd.DataFrame())
         p2026 = safe(df_a.iloc[4,4]) if (not df_a.empty and sh!="Corporativo") else 0
         res.append(dict(nome=nome,sheet=sh,
-            meta=safe(df.iloc[21,col]),prev=safe(df.iloc[22,col]),
-            prev2026=p2026,val=safe(df.iloc[24,col]),
-            real=safe(df.iloc[25,col]),pct=safe(df.iloc[26,col])))
+            meta=safe(df.iloc[22,col]),prev=safe(df.iloc[23,col]),
+            prev2026=p2026,val=safe(df.iloc[25,col]),
+            real=safe(df.iloc[26,col]),pct=safe(df.iloc[27,col])))
     return res
 
 def extract_pilares_global(d):
     """Pilares do painel 5 Unidades (rows 12-16)."""
     df = d["u5"]
     res=[]
-    for i in range(12,17):
+    for i in range(12,22):
         nome=df.iloc[i,3]
-        if pd.notna(nome) and str(nome)!="TOTAL":
-            res.append(dict(
-                nome=str(nome),qtd=int(safe(df.iloc[i,4])),
-                prev=safe(df.iloc[i,5]),val=safe(df.iloc[i,6]),
-                pct=safe(df.iloc[i,7])))
+        if pd.notna(nome) and str(nome) not in ("TOTAL",""):
+            try:
+                res.append(dict(
+                    nome=str(nome),qtd=int(safe(df.iloc[i,4])),
+                    prev=safe(df.iloc[i,5]),val=safe(df.iloc[i,6]),
+                    pct=safe(df.iloc[i,7])))
+            except: pass
     return res
 
 def extract_pilares_local(projetos):
