@@ -369,9 +369,18 @@ def extract_pilares_local(projetos):
 def extract_evolucao(d):
     df = d["u5"]
     meses=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
-    def row(r): return [safe(df.iloc[r,c]) for c in range(22,34)]
-    return dict(meses=meses,prev=row(53),real=row(54),
-                acum_prev=row(56),acum_real=row(57),proj_meta=row(58))
+    # v12: col21=label, cols 22-33=monthly, rows deslocados +1
+    # row54=Previsto, row55=Real, row57=Acum.Prev, row58=Acum.Real, row59=Projeção Meta
+    max_col = min(34, df.shape[1])
+    def row(r): return [safe(df.iloc[r,c]) for c in range(22, max_col)]
+    # Pad to 12 if needed
+    def pad(lst): return (lst + [0]*12)[:12]
+    return dict(meses=meses,
+                prev     =pad(row(54)),
+                real     =pad(row(55)),
+                acum_prev=pad(row(57)),
+                acum_real=pad(row(58)),
+                proj_meta=pad(row(59)))
 
 # ── EXTRAÇÃO DE PROJETOS — FUNÇÃO CENTRAL ─────────────────────────────────────
 def extract_projetos(df, start_row, col_tipo=0, col_nome=2, col_resp=5,
@@ -571,6 +580,8 @@ def chart_evolucao(ev, series):
 
 def chart_donut(labels,values,colors):
     total = sum(values)
+    if total == 0:
+        total = 1  # evita ZeroDivisionError quando todos os valores são zero
     txt = [f"  {labels[i]}  {values[i]/total*100:.1f}%  {fmt_mi(values[i])}"
            for i in range(len(labels))]
     fig = go.Figure(go.Pie(labels=txt,values=values,hole=0.62,
@@ -877,12 +888,13 @@ def kpi(cls,lbl,vb,sub,det):
             f'<div class="kpi-v">{vb}</div><div class="kpi-s">{sub}</div>'
             f'<div class="kpi-d">{det}</div></div>')
 
-st.markdown(f"""<div class="kpi-wrap">
+st.markdown(f"""<div class="kpi-wrap kpi-6">
   {kpi("","Meta Anual do Grupo (2026)",fmt_mi(meta),fmt_brl(meta),"Objetivo 2026 — 100%")}
   {kpi("cs","Portfólio Previsto (Anualizado)",fmt_mi(portfolio),fmt_brl(portfolio),f"{cob:.1f}% da meta coberta")}
   {kpi("ca","Previsto 2026",fmt_mi(prev2026),fmt_brl(prev2026),f"{pp:.1f}% do portfólio total")}
   {kpi("","Validado por Custos (2026)",fmt_mi(validado),fmt_brl(validado),f"{pv:.1f}% do Previsto 2026")}
   {kpi("cg","Retorno Real (DRE) (2026)",fmt_mi(real),fmt_brl(real),f"{pct_ating*100:.1f}% de atingimento")}
+  {kpi("cr","Extra DRE (Até o Momento)",fmt_mi(extra_dre),fmt_brl(extra_dre),"Ganho fora do DRE acumulado")}
 </div>""", unsafe_allow_html=True)
 
 st.markdown(f"""<div class="nota">
