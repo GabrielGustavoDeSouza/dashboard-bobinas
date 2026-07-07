@@ -69,6 +69,7 @@ st.markdown("""
 
     /* ===== Selectbox / Multiselect (componentes BaseWeb) ===== */
     .stSelectbox label, .stMultiSelect label { color: #475569 !important; font-weight: 600 !important; }
+    /* Caixa de seleção fechada */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         border: 1px solid #E2E6F0 !important;
@@ -77,13 +78,7 @@ st.markdown("""
     }
     div[data-baseweb="select"] * { color: #1F2937 !important; }
     div[data-baseweb="select"] svg { fill: #94A3B8 !important; }
-    div[data-baseweb="popover"] div[data-baseweb="menu"],
-    ul[data-baseweb="menu"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #E2E6F0 !important;
-    }
-    li[role="option"] { background-color: #FFFFFF !important; color: #1F2937 !important; }
-    li[role="option"]:hover, li[aria-selected="true"] { background-color: #EEF1FB !important; }
+    /* Tags (pílulas dos itens selecionados) */
     span[data-baseweb="tag"] {
         background-color: #E6ECFD !important;
         color: #1400FF !important;
@@ -92,6 +87,40 @@ st.markdown("""
     }
     span[data-baseweb="tag"] span { color: #1400FF !important; }
     span[data-baseweb="tag"] svg { fill: #1400FF !important; }
+    /* Dropdown aberto (popover/portal — renderizado fora do main pelo React) */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] * { background-color: #FFFFFF !important; color: #1F2937 !important; }
+    div[data-baseweb="popover"] svg { fill: #94A3B8 !important; }
+    div[data-baseweb="menu"],
+    ul[data-baseweb="menu"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E6F0 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.08) !important;
+        overflow: hidden !important;
+    }
+    ul[data-baseweb="menu"] li,
+    li[role="option"],
+    div[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #1F2937 !important;
+    }
+    ul[data-baseweb="menu"] li:hover,
+    li[role="option"]:hover,
+    div[role="option"]:hover,
+    li[aria-selected="true"],
+    div[aria-selected="true"] {
+        background-color: #EEF1FB !important;
+        color: #1400FF !important;
+    }
+    /* Checkmark e ícones dentro das opções */
+    li[role="option"] svg, div[role="option"] svg { fill: #4D6BFF !important; }
+    /* Input de busca dentro do popover */
+    div[data-baseweb="popover"] input {
+        background-color: #FFFFFF !important;
+        color: #1F2937 !important;
+        border-color: #E2E6F0 !important;
+    }
 
     /* ===== Inputs do BaseWeb (senha, texto) — tema claro ===== */
     div[data-baseweb="input"], div[data-baseweb="base-input"] {
@@ -1391,33 +1420,9 @@ def main():
             with fcol2:
                 sel_fontes = st.multiselect("Fonte:", fontes_disp, default=fontes_disp, key="prop_fonte")
 
-            tcol1, tcol2, _tcol3 = st.columns([1, 1, 2])
-            with tcol1:
-                only_pend_compras = st.toggle(
-                    "Pendente Formalização c/ Compras",
-                    key="toggle_pendente_compras",
-                    help="Mostra apenas propostas ainda não formalizadas com Compras.",
-                )
-            with tcol2:
-                only_pend_usina = st.toggle(
-                    "Pendente Envio à Usina",
-                    key="toggle_pendente_usina",
-                    help="Mostra apenas propostas ainda não enviadas à usina.",
-                )
-
             df_f = df_propostas[
                 df_propostas['_PLANTA'].isin(sel_plantas) & df_propostas['_FONTE'].isin(sel_fontes)
             ].copy()
-
-            if only_pend_compras:
-                df_f = df_f[df_f['_STAGES'].apply(
-                    lambda stages: bool(stages) and stages[0]['col'] == 'FORMALIZADO COM COMPRAS' and stages[0]['status'] != 'done'
-                )]
-            if only_pend_usina:
-                df_f = df_f[df_f['_STAGES'].apply(
-                    lambda stages: bool(stages) and len(stages) > 1
-                    and stages[1]['col'] == 'DATA ENVIO P/ USINA' and stages[1]['status'] not in ('done', 'na')
-                )]
 
             st.markdown("  ", unsafe_allow_html=True)
 
@@ -1451,8 +1456,35 @@ def main():
                     render_chart(fig_prop_prog)
 
                 st.markdown("### Linha do Tempo por Proposta")
+
+                # Toggles logo abaixo do título da timeline
+                tcol1, tcol2, _tcol3 = st.columns([1, 1, 2])
+                with tcol1:
+                    only_pend_compras = st.toggle(
+                        "Pendente Formalização c/ Compras",
+                        key="toggle_pendente_compras",
+                        help="Mostra apenas propostas ainda não formalizadas com Compras.",
+                    )
+                with tcol2:
+                    only_pend_usina = st.toggle(
+                        "Pendente Envio à Usina",
+                        key="toggle_pendente_usina",
+                        help="Mostra apenas propostas ainda não enviadas à usina.",
+                    )
+
+                df_tl = df_f.copy()
+                if only_pend_compras:
+                    df_tl = df_tl[df_tl['_STAGES'].apply(
+                        lambda stages: bool(stages) and stages[0]['col'] == 'FORMALIZADO COM COMPRAS' and stages[0]['status'] != 'done'
+                    )]
+                if only_pend_usina:
+                    df_tl = df_tl[df_tl['_STAGES'].apply(
+                        lambda stages: bool(stages) and len(stages) > 1
+                        and stages[1]['col'] == 'DATA ENVIO P/ USINA' and stages[1]['status'] not in ('done', 'na')
+                    )]
+
                 st.markdown(
-                    '<p style="color:#64748B; font-size:12px; margin-top:-8px;">'
+                    '<p style="color:#64748B; font-size:12px; margin-top:4px;">'
                     'Cada bolinha representa uma das 8 etapas do processo. '
                     '<span style="color:#1400FF;">●</span> concluída / não se aplica &nbsp; '
                     '<span style="color:#FFB800;">○</span> pendente &nbsp; '
@@ -1462,16 +1494,19 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-                # Ordena: planta na ordem padrão Delga primeiro, depois alfabética
-                ordem_preferida = ['FERRAZ', 'DIADEMA', 'JARINU', 'SUL']
-                plantas_ordenadas = sorted(
-                    df_f['_PLANTA'].unique().tolist(),
-                    key=lambda p: (ordem_preferida.index(p) if p in ordem_preferida else 99, p)
-                )
+                if len(df_tl) == 0:
+                    st.info("Nenhuma proposta corresponde aos filtros de pendência selecionados.")
+                else:
+                    # Ordena: planta na ordem padrão Delga primeiro, depois alfabética
+                    ordem_preferida = ['FERRAZ', 'DIADEMA', 'JARINU', 'SUL']
+                    plantas_ordenadas = sorted(
+                        df_tl['_PLANTA'].unique().tolist(),
+                        key=lambda p: (ordem_preferida.index(p) if p in ordem_preferida else 99, p)
+                    )
 
                 full_html = ""
                 for planta in plantas_ordenadas:
-                    df_grupo = df_f[df_f['_PLANTA'] == planta].sort_values('_PCT', ascending=True)
+                    df_grupo = df_tl[df_tl['_PLANTA'] == planta].sort_values('_PCT', ascending=True)
                     full_html += render_acompanhamento_block(planta, df_grupo)
 
                 st.markdown(full_html, unsafe_allow_html=True)
