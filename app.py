@@ -191,37 +191,58 @@ st.markdown("""
     .acomp-stat-lbl { color:#64748B; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
     .acomp-rows { border:1px solid #E2E6F0; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
 
-    .tl-row { display:flex; align-items:center; padding:28px 20px 44px 20px; border-bottom:1px solid #EDF0F6; gap:24px; }
+    .tl-row { display:flex; align-items:flex-start; padding:20px 20px 28px 20px; border-bottom:1px solid #EDF0F6; gap:20px; }
     .tl-row:last-child { border-bottom:none; }
     .tl-row:hover { background:#F8FAFD; }
 
-    .tl-info { width:260px; flex-shrink:0; }
+    .tl-info { width:230px; flex-shrink:0; padding-top:18px; }
     .tl-code { color:#1F2937; font-weight:700; font-size:14px; }
-    .tl-desc { color:#64748B; font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .tl-meta { color:#64748B; font-size:11px; margin-top:5px; }
+    .tl-desc { color:#64748B; font-size:11.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-meta { color:#94A3B8; font-size:10.5px; margin-top:4px; }
     .tl-badge {
-        display:inline-block; font-size:10.5px; padding:3px 10px; border-radius:20px;
+        display:inline-block; font-size:10px; padding:3px 9px; border-radius:20px;
         margin-top:8px; font-weight:700; letter-spacing:.3px;
     }
 
-    .tl-track { flex:1; position:relative; height:100px; min-width:520px; }
-    .tl-line-bg { position:absolute; top:35px; left:11px; right:11px; height:3px; background:#E2E6F0; border-radius:2px; }
-    .tl-line-fill { position:absolute; top:35px; left:11px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
-    .tl-nodes { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:space-between; }
-    .tl-node { display:flex; flex-direction:column; align-items:center; width:1px; position:relative; }
-    /* Departamento acima da bolinha */
-    .tl-dept { font-size:9px; font-weight:700; color:#1400FF; text-transform:uppercase; letter-spacing:.5px; text-align:center; width:88px; transform:translateX(-43.5px); line-height:1.2; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:11px; }
-    .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #E2E6F0; background:#F8FAFD; z-index:1; box-sizing:border-box; flex-shrink:0; transform:translateX(-11px); }
-    .tl-dot.done { background:#1400FF; border-color:#1400FF; }
-    .tl-dot.na { background:#1400FF; border-color:#1400FF; }
+    /* Trilha principal */
+    .tl-track { flex:1; display:flex; flex-direction:column; gap:0; min-width:0; }
+
+    /* Linha dos departamentos */
+    .tl-depts { display:flex; padding:0 0 4px 0; }
+    .tl-dept-cell { flex:1; text-align:center; padding:0 2px; }
+    .tl-dept-pill {
+        display:inline-block; font-size:8.5px; font-weight:700; text-transform:uppercase;
+        letter-spacing:.5px; padding:2px 6px; border-radius:10px;
+        background:#EEF1FB; color:#1400FF; border:1px solid #CBD8FB;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+    }
+    .tl-dept-pill.dept-eng { background:#FFF7ED; color:#C2610C; border-color:#FED7AA; }
+    .tl-dept-pill.dept-log { background:#F0FDF4; color:#166534; border-color:#BBF7D0; }
+    .tl-dept-pill.dept-sol { background:#FAF5FF; color:#7C3AED; border-color:#DDD6FE; }
+    .tl-dept-pill.dept-all { background:#F8FAFC; color:#64748B; border-color:#E2E6F0; }
+
+    /* Linha da bolinha + conectores */
+    .tl-spine { display:flex; align-items:center; height:26px; }
+    .tl-connector { flex:1; height:3px; background:#E2E6F0; }
+    .tl-connector.filled { background:linear-gradient(90deg,#1400FF,#4DA3FF); }
+    .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #D1D7E3; background:#F8FAFD; flex-shrink:0; box-sizing:border-box; }
+    .tl-dot.done    { background:#1400FF; border-color:#1400FF; }
+    .tl-dot.na      { background:#1400FF; border-color:#1400FF; }
     .tl-dot.planned { background:#F8FAFD; border-color:#4DA3FF; }
     .tl-dot.pending { background:#F8FAFD; border-color:#FFB800; }
-    .tl-dot.empty { background:#F8FAFD; border-color:#D1D7E3; }
-    .tl-label { font-size:10.5px; color:#1F2937; font-weight:600; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
-    .tl-label-info { font-size:10.5px; color:#94A3B8; font-weight:500; font-style:italic; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
-    .tl-value { font-size:10px; color:#8893A6; margin-top:3px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.25; }
-    /* Etapa informativa (não conta no %): borda tracejada */
-    .tl-dot.tl-dot-info { border-style: dashed !important; opacity: 0.75; }
+    .tl-dot.empty   { background:#F8FAFD; border-color:#D1D7E3; }
+    .tl-dot.tl-dot-info { border-style:dashed !important; opacity:.7; }
+
+    /* Labels e valores abaixo da trilha */
+    .tl-labels { display:flex; padding-top:6px; }
+    .tl-label-cell { flex:1; text-align:center; padding:0 3px; }
+    .tl-label { font-size:10px; color:#334155; font-weight:600; line-height:1.3; display:block; }
+    .tl-label.tl-label-info { color:#94A3B8; font-weight:500; font-style:italic; }
+    .tl-value { font-size:9.5px; color:#94A3B8; margin-top:2px; line-height:1.25; display:block; }
+
+    .tl-pct { width:80px; text-align:right; flex-shrink:0; padding-top:22px; }
+    .tl-pct-num { font-size:22px; font-weight:800; color:#1F2937; }
+    .tl-pct-label { font-size:10px; color:#64748B; }
 
     .tl-pct { width:90px; text-align:right; flex-shrink:0; }
     .tl-pct-num { font-size:22px; font-weight:800; color:#1F2937; }
@@ -293,15 +314,15 @@ ADMIN_PASSWORD = "M@ster"
 # Tupla: (coluna_excel, label_visual, conta_no_pct)
 # A coluna "DATA DE CADASTRO DO NOVO PN" é apenas visual — não conta no %.
 STAGE_DEFS = [
-    ("FORMALIZADO COM COMPRAS", "Formalização c/ Compras", True),
-    ("DATA ENVIO P/ USINA", "Envio à Usina", True),
-    ("PRAZO DA USINA PARA RETORNO", "Retorno da Usina", True),
-    ("DATA DE DEVOLUÇÃO DA CONSULTA", "Devolução da Consulta", True),
-    ("ENVIO DE PLANO DE CORTE PARA COMPRAS", "Plano de Corte → Compras", True),
-    ("ENVIO DO PLANO DE CORTE PARA USINAS", "Plano de Corte → Usina", True),
-    ("PRAZO PARA CADASTRO DO NOVO PN (LIBERAR PROGRAMAÇÃO)", "Prazo Cadastro PN", True),
-    ("DATA DE CADASTRO DO NOVO PN", "Data Cadastro PN", False),
-    ("PRAZO DE RECEBIMENTO NAS NOVAS ESPECIFICAÇÕES (APROXIMADO)", "Recebimento Material", True),
+    ("FORMALIZADO COM COMPRAS",                                    "Formaliz. c/ Compras",  True),
+    ("DATA ENVIO P/ USINA",                                        "Envio à Usina",          True),
+    ("PRAZO DA USINA PARA RETORNO",                                "Prazo Retorno Usina",    True),
+    ("DATA DE DEVOLUÇÃO DA CONSULTA",                              "Devolução da Consulta",  True),
+    ("ENVIO DE PLANO DE CORTE PARA COMPRAS",                       "Plano de Corte → Compras", True),
+    ("ENVIO DO PLANO DE CORTE PARA USINAS",                        "Plano de Corte → Usina", True),
+    ("PRAZO PARA CADASTRO DO NOVO PN (LIBERAR PROGRAMAÇÃO)",       "Prazo Cadastro PN",      True),
+    ("DATA DE CADASTRO DO NOVO PN",                                "Data Cadastro PN ✦",     False),
+    ("PRAZO DE RECEBIMENTO NAS NOVAS ESPECIFICAÇÕES (APROXIMADO)", "Recebimento",            True),
 ]
 
 STAGE_STATUS_COLOR = {
@@ -771,38 +792,71 @@ def process_propostas(df_raw, dept_map=None):
     return df
 
 
+def _dept_pill_class(dept):
+    d = dept.upper()
+    if 'ENGENH' in d:  return 'dept-eng'
+    if 'LOG'   in d:  return 'dept-log'
+    if 'SOLIC' in d:  return 'dept-sol'
+    if 'TODOS' in d:  return 'dept-all'
+    return ''
+
+
 def render_timeline_row_html(row):
-    n_stages = max(row['_N_STAGES'], 1)
     pct = row['_PCT']
     codigo = html_lib.escape(str(row['CÓDIGO DELGA']))
     desc = html_lib.escape(str(row['_DESCRICAO'])[:60])
     badge_label, badge_color = row['_BADGE']
+    fonte_txt = html_lib.escape(str(row['_FONTE']))
+    stages = row['_STAGES']
 
-    nodes_html = []
-    for st_info in row['_STAGES']:
-        status = st_info['status']
-        counts = st_info.get('counts', True)
-        dept = html_lib.escape(st_info.get('dept', '') or '')
-        label = html_lib.escape(st_info['label'])
-        texto_raw = st_info['texto'] if st_info['texto'] else '—'
-        texto = html_lib.escape(texto_raw)
-        tooltip = f"{label}: {texto_raw}"
-        label_style = '' if counts else ' tl-label-info'
-        dot_style = f' tl-dot-info' if not counts else ''
-        nodes_html.append(
-            f'<div class="tl-node" title="{tooltip}">'
-            f'<div class="tl-dept">{dept}</div>'
-            f'<div class="tl-dot {status}{dot_style}"></div>'
-            f'<div class="tl-label{label_style}">{label}</div>'
-            f'<div class="tl-value">{texto}</div>'
+    # --- Linha 1: pílulas de departamento ---
+    depts_html = ''
+    for st in stages:
+        dept = html_lib.escape(st.get('dept', '') or '')
+        pill_cls = _dept_pill_class(dept)
+        depts_html += (
+            f'<div class="tl-dept-cell">'
+            f'<span class="tl-dept-pill {pill_cls}">{dept or "&nbsp;"}</span>'
             f'</div>'
         )
 
-    fonte_txt = html_lib.escape(str(row['_FONTE']))
+    # --- Linha 2: spine com bolinhas e conectores ---
+    # Conta quantas etapas concluídas há em sequência desde o início
+    filled_up_to = 0
+    for st in stages:
+        if st['status'] in ('done', 'na'):
+            filled_up_to += 1
+        else:
+            break
 
-    # IMPORTANTE: sem indentação/quebras de linha "soltas" no HTML — texto
-    # indentado com 4+ espaços é interpretado pelo Markdown do Streamlit
-    # como bloco de código, quebrando a renderização.
+    spine_html = ''
+    for i, st in enumerate(stages):
+        status = st['status']
+        counts = st.get('counts', True)
+        dot_cls = f'tl-dot {status}' + (' tl-dot-info' if not counts else '')
+        # conector à esquerda da bolinha (exceto no primeiro)
+        if i > 0:
+            conn_cls = 'tl-connector filled' if i < filled_up_to else 'tl-connector'
+            spine_html += f'<div class="{conn_cls}"></div>'
+        spine_html += f'<div class="{dot_cls}"></div>'
+
+    # --- Linha 3: labels e valores ---
+    labels_html = ''
+    for st in stages:
+        label = html_lib.escape(st['label'].replace(' ✦',''))
+        extra = ' ✦' if not st.get('counts', True) else ''
+        label_cls = 'tl-label' + (' tl-label-info' if not st.get('counts', True) else '')
+        texto_raw = st['texto'] if st['texto'] else '—'
+        texto = html_lib.escape(texto_raw)
+        labels_html += (
+            f'<div class="tl-label-cell">'
+            f'<span class="{label_cls}">{label}{html_lib.escape(extra)}</span>'
+            f'<span class="tl-value">{texto}</span>'
+            f'</div>'
+        )
+
+    # IMPORTANTE: sem indentação/quebras de linha "soltas" — texto
+    # indentado com 4+ espaços vira bloco de código no Markdown do Streamlit.
     row_html = (
         '<div class="tl-row">'
         '<div class="tl-info">'
@@ -812,9 +866,9 @@ def render_timeline_row_html(row):
         f'<span class="tl-badge" style="background:{badge_color}22; color:{badge_color}; border:1px solid {badge_color}55;">{badge_label}</span>'
         '</div>'
         '<div class="tl-track">'
-        '<div class="tl-line-bg"></div>'
-        f'<div class="tl-line-fill" style="width:{pct}%;"></div>'
-        f'<div class="tl-nodes">{"".join(nodes_html)}</div>'
+        f'<div class="tl-depts">{depts_html}</div>'
+        f'<div class="tl-spine">{spine_html}</div>'
+        f'<div class="tl-labels">{labels_html}</div>'
         '</div>'
         '<div class="tl-pct">'
         f'<div class="tl-pct-num">{pct}%</div>'
