@@ -216,7 +216,10 @@ st.markdown("""
     .tl-dot.pending { background:#F8FAFD; border-color:#FFB800; }
     .tl-dot.empty { background:#F8FAFD; border-color:#D1D7E3; }
     .tl-label { font-size:10.5px; color:#1F2937; font-weight:600; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
+    .tl-label-info { font-size:10.5px; color:#94A3B8; font-weight:500; font-style:italic; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
     .tl-value { font-size:10px; color:#8893A6; margin-top:3px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.25; }
+    /* Bolinha de etapa informativa (não conta no %): borda tracejada */
+    .tl-dot.tl-dot-info { border-style: dashed !important; opacity: 0.75; }
 
     .tl-pct { width:90px; text-align:right; flex-shrink:0; }
     .tl-pct-num { font-size:22px; font-weight:800; color:#1F2937; }
@@ -285,16 +288,18 @@ ADMIN_PASSWORD = "M@ster"
 # ============================================================
 # CONFIGURAÇÃO DA ABA "A.Propostas" (Acompanhamento)
 # ============================================================
-# Coluna "FORMALIZADO COM COMPRAS" + "PASSADO PARA USINA ?" + as 7 etapas seguintes
+# Tupla: (coluna_excel, label_visual, conta_no_pct)
+# A coluna "DATA DE CADASTRO DO NOVO PN" é apenas visual — não conta no %.
 STAGE_DEFS = [
-    ("FORMALIZADO COM COMPRAS", "Formalização com Compras"),
-    ("DATA ENVIO P/ USINA", "Envio à Usina"),
-    ("PRAZO DA USINA PARA RETORNO", "Retorno da Usina"),
-    ("DATA DE DEVOLUÇÃO DA CONSULTA", "Devolução da Consulta"),
-    ("ENVIO DE PLANO DE CORTE PARA COMPRAS", "Plano de Corte → Compras"),
-    ("ENVIO DO PLANO DE CORTE PARA USINAS", "Plano de Corte → Usina"),
-    ("PRAZO PARA CADASTRO DO NOVO PN (LIBERAR PROGRAMAÇÃO)", "Cadastro Novo PN"),
-    ("PRAZO DE RECEBIMENTO NAS NOVAS ESPECIFICAÇÕES (APROXIMADO)", "Recebimento Material"),
+    ("FORMALIZADO COM COMPRAS", "Formalização c/ Compras", True),
+    ("DATA ENVIO P/ USINA", "Envio à Usina", True),
+    ("PRAZO DA USINA PARA RETORNO", "Retorno da Usina", True),
+    ("DATA DE DEVOLUÇÃO DA CONSULTA", "Devolução da Consulta", True),
+    ("ENVIO DE PLANO DE CORTE PARA COMPRAS", "Plano de Corte → Compras", True),
+    ("ENVIO DO PLANO DE CORTE PARA USINAS", "Plano de Corte → Usina", True),
+    ("PRAZO PARA CADASTRO DO NOVO PN (LIBERAR PROGRAMAÇÃO)", "Prazo Cadastro PN", True),
+    ("DATA DE CADASTRO DO NOVO PN", "Data Cadastro PN", False),
+    ("PRAZO DE RECEBIMENTO NAS NOVAS ESPECIFICAÇÕES (APROXIMADO)", "Recebimento Material", True),
 ]
 
 STAGE_STATUS_COLOR = {
@@ -697,12 +702,14 @@ def process_propostas(df_raw):
     badge_list = []
     completed_list = []
 
-    available_stages = [(c, label) for c, label in STAGE_DEFS if c in df.columns]
+    available_stages = [(c, label, counts) for c, label, counts in STAGE_DEFS if c in df.columns]
+    # n_stages conta apenas etapas que entram no percentual
+    n_stages_pct = sum(1 for _, _, counts in available_stages if counts)
 
     for _, row in df.iterrows():
         stages = []
         completed = 0
-        for col, label in available_stages:
+        for col, label, counts in available_stages:
             if col == 'FORMALIZADO COM COMPRAS':
                 status, texto = classify_formalizacao(
                     row.get(col), row['_PASSADO'],
@@ -710,27 +717,27 @@ def process_propostas(df_raw):
                 )
             else:
                 status, texto = classify_stage_value(row.get(col))
-            if status in ('done', 'na'):
+            if counts and status in ('done', 'na'):
                 completed += 1
-            stages.append({'col': col, 'label': label, 'status': status, 'texto': texto})
+            stages.append({'col': col, 'label': label, 'status': status, 'texto': texto, 'counts': counts})
 
-        n_stages = len(available_stages) if available_stages else 1
+        n_for_pct = n_stages_pct if n_stages_pct else 1
         passado = row['_PASSADO']
 
         if 'NÃO' in passado or passado == 'NAO':
             pct = 0
             badge = ('Não enviado à usina', COLORS['coral'])
         elif 'KAIZEN' in passado:
-            pct = round(completed / n_stages * 100)
+            pct = round(completed / n_for_pct * 100)
             badge = ('Kaizen Plano de Corte', COLORS['purple'])
-        elif completed == n_stages and n_stages > 0:
+        elif completed == n_stages_pct and n_stages_pct > 0:
             pct = 100
             badge = ('Concluído', COLORS['emerald'])
         elif completed == 0:
             pct = 0
             badge = ('Aguardando início', COLORS['text_light'])
         else:
-            pct = round(completed / n_stages * 100)
+            pct = round(completed / n_for_pct * 100)
             badge = ('Em andamento', COLORS['cyan'])
 
         stage_status_list.append(stages)
@@ -742,7 +749,7 @@ def process_propostas(df_raw):
     df['_PCT'] = pct_list
     df['_BADGE'] = badge_list
     df['_COMPLETED'] = completed_list
-    df['_N_STAGES'] = len(available_stages) if available_stages else 0
+    df['_N_STAGES'] = len(available_stages)
 
     return df
 
@@ -757,14 +764,17 @@ def render_timeline_row_html(row):
     nodes_html = []
     for st_info in row['_STAGES']:
         status = st_info['status']
+        counts = st_info.get('counts', True)
         label = html_lib.escape(st_info['label'])
         texto_raw = st_info['texto'] if st_info['texto'] else '—'
         texto = html_lib.escape(texto_raw)
         tooltip = f"{label}: {texto_raw}"
+        label_style = '' if counts else ' tl-label-info'
+        dot_style = f' tl-dot-info' if not counts else ''
         nodes_html.append(
             f'<div class="tl-node" title="{tooltip}">'
-            f'<div class="tl-dot {status}"></div>'
-            f'<div class="tl-label">{label}</div>'
+            f'<div class="tl-dot {status}{dot_style}"></div>'
+            f'<div class="tl-label{label_style}">{label}</div>'
             f'<div class="tl-value">{texto}</div>'
             f'</div>'
         )
@@ -1157,7 +1167,16 @@ def build_light_table_html(df_table):
 def main():
     # SIDEBAR
     with st.sidebar:
-        st.image("logo_delga.png", use_container_width=True)
+        try:
+            st.image("logo_delga.png", use_container_width=True)
+        except Exception:
+            st.markdown(
+                '<div style="text-align:center; padding:12px 0;">'
+                '<span style="font-size:22px; font-weight:900; color:#1400FF; letter-spacing:-1px; font-family:Inter,sans-serif;">GRUPO</span><br>'
+                '<span style="font-size:28px; font-weight:900; color:#1F2937; letter-spacing:-1px; font-family:Inter,sans-serif;">DELGA</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown("""
         <div style="text-align:center; padding:8px 0 16px 0;">
             <p style="color:#64748B; font-size:11px; margin:0; text-transform:uppercase; letter-spacing:1.5px; font-weight:600;">Controle de Matéria-Prima</p>
@@ -1485,11 +1504,12 @@ def main():
 
                 st.markdown(
                     '<p style="color:#64748B; font-size:12px; margin-top:4px;">'
-                    'Cada bolinha representa uma das 8 etapas do processo. '
+                    'Cada bolinha representa uma das 9 etapas do processo. '
                     '<span style="color:#1400FF;">●</span> concluída / não se aplica &nbsp; '
                     '<span style="color:#FFB800;">○</span> pendente &nbsp; '
                     '<span style="color:#4DA3FF;">○</span> prevista (data futura) &nbsp; '
-                    '<span style="color:#D1D7E3;">○</span> não iniciada'
+                    '<span style="color:#D1D7E3;">○</span> não iniciada &nbsp; '
+                    '<span style="color:#94A3B8; font-style:italic;">○ - - -</span> informativa (não conta no %)'
                     '</p>',
                     unsafe_allow_html=True,
                 )
