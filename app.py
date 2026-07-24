@@ -191,7 +191,7 @@ st.markdown("""
     .acomp-stat-lbl { color:#64748B; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
     .acomp-rows { border:1px solid #E2E6F0; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; }
 
-    .tl-row { display:flex; align-items:center; padding:22px 20px 40px 20px; border-bottom:1px solid #EDF0F6; gap:24px; }
+    .tl-row { display:flex; align-items:center; padding:28px 20px 44px 20px; border-bottom:1px solid #EDF0F6; gap:24px; }
     .tl-row:last-child { border-bottom:none; }
     .tl-row:hover { background:#F8FAFD; }
 
@@ -204,11 +204,13 @@ st.markdown("""
         margin-top:8px; font-weight:700; letter-spacing:.3px;
     }
 
-    .tl-track { flex:1; position:relative; height:78px; min-width:520px; }
-    .tl-line-bg { position:absolute; top:11px; left:11px; right:11px; height:3px; background:#E2E6F0; border-radius:2px; }
-    .tl-line-fill { position:absolute; top:11px; left:11px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
+    .tl-track { flex:1; position:relative; height:100px; min-width:520px; }
+    .tl-line-bg { position:absolute; top:35px; left:11px; right:11px; height:3px; background:#E2E6F0; border-radius:2px; }
+    .tl-line-fill { position:absolute; top:35px; left:11px; height:3px; background:linear-gradient(90deg,#1400FF,#4DA3FF); border-radius:2px; }
     .tl-nodes { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:space-between; }
     .tl-node { display:flex; flex-direction:column; align-items:center; width:1px; position:relative; }
+    /* Departamento acima da bolinha */
+    .tl-dept { font-size:9px; font-weight:700; color:#1400FF; text-transform:uppercase; letter-spacing:.5px; text-align:center; width:88px; transform:translateX(-43.5px); line-height:1.2; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:11px; }
     .tl-dot { width:22px; height:22px; border-radius:50%; border:3px solid #E2E6F0; background:#F8FAFD; z-index:1; box-sizing:border-box; flex-shrink:0; transform:translateX(-11px); }
     .tl-dot.done { background:#1400FF; border-color:#1400FF; }
     .tl-dot.na { background:#1400FF; border-color:#1400FF; }
@@ -218,7 +220,7 @@ st.markdown("""
     .tl-label { font-size:10.5px; color:#1F2937; font-weight:600; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
     .tl-label-info { font-size:10.5px; color:#94A3B8; font-weight:500; font-style:italic; margin-top:8px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.3; }
     .tl-value { font-size:10px; color:#8893A6; margin-top:3px; text-align:center; width:104px; transform:translateX(-51.5px); line-height:1.25; }
-    /* Bolinha de etapa informativa (não conta no %): borda tracejada */
+    /* Etapa informativa (não conta no %): borda tracejada */
     .tl-dot.tl-dot-info { border-style: dashed !important; opacity: 0.75; }
 
     .tl-pct { width:90px; text-align:right; flex-shrink:0; }
@@ -354,9 +356,9 @@ def load_data_from_github():
         excel_bytes.seek(0)
         df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
         excel_bytes.seek(0)
-        df_propostas = smart_read_propostas(excel_bytes)
-        return df_controle, df_formulas, df_propostas
-    return None, None, None
+        df_propostas, df_dept_map = smart_read_propostas(excel_bytes)
+        return df_controle, df_formulas, df_propostas, df_dept_map
+    return None, None, None, {}
 
 
 def save_data_to_github(file_bytes, filename):
@@ -433,8 +435,8 @@ def load_data_from_sharepoint():
     excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
     excel_bytes.seek(0)
-    df_propostas = smart_read_propostas(excel_bytes)
-    return df_controle, df_formulas, df_propostas
+    df_propostas, df_dept_map = smart_read_propostas(excel_bytes)
+    return df_controle, df_formulas, df_propostas, df_dept_map
 
 
 def find_header_row(excel_bytes, sheet_name, markers, max_scan=15):
@@ -467,7 +469,9 @@ def smart_read_excel(excel_bytes, sheet_name):
 
 def smart_read_propostas(excel_bytes):
     """Lê a aba 'A.Propostas' (controle de acompanhamento de propostas BSW).
-    Retorna None se a aba não existir no arquivo (compatibilidade com arquivos antigos)."""
+    Retorna (df, dept_map) onde dept_map é {nome_coluna: departamento} lido
+    da linha imediatamente acima do cabeçalho.
+    Retorna (None, {}) se a aba não existir (compatibilidade com arquivos antigos)."""
     try:
         excel_bytes.seek(0)
         xls = pd.ExcelFile(excel_bytes)
@@ -477,16 +481,27 @@ def smart_read_propostas(excel_bytes):
                 sheet_name = s
                 break
         if sheet_name is None:
-            return None
+            return None, {}
         header_row = find_header_row(excel_bytes, sheet_name, ['CÓDIGO DELGA', 'CODIGO DELGA'])
         excel_bytes.seek(0)
         df = pd.read_excel(
             excel_bytes, sheet_name=sheet_name, header=header_row,
             keep_default_na=False, na_values=['']
         )
-        return df
+        # Ler linha de departamentos (uma linha acima do cabeçalho, se existir)
+        dept_map = {}
+        if header_row > 0:
+            excel_bytes.seek(0)
+            df_raw_all = pd.read_excel(excel_bytes, sheet_name=sheet_name, header=None)
+            dept_row = df_raw_all.iloc[header_row - 1]
+            header_row_vals = df_raw_all.iloc[header_row]
+            for col_idx, col_name in enumerate(header_row_vals):
+                dept_val = dept_row.iloc[col_idx] if col_idx < len(dept_row) else None
+                if pd.notna(col_name) and pd.notna(dept_val) and str(dept_val).strip():
+                    dept_map[str(col_name).replace('\n', ' ').strip()] = str(dept_val).strip()
+        return df, dept_map
     except Exception:
-        return None
+        return None, {}
 
 
 def load_data_from_upload(uploaded_file):
@@ -495,8 +510,8 @@ def load_data_from_upload(uploaded_file):
     excel_bytes.seek(0)
     df_formulas = pd.read_excel(excel_bytes, sheet_name="Formulas")
     excel_bytes.seek(0)
-    df_propostas = smart_read_propostas(excel_bytes)
-    return df_controle, df_formulas, df_propostas
+    df_propostas, df_dept_map = smart_read_propostas(excel_bytes)
+    return df_controle, df_formulas, df_propostas, df_dept_map
 
 
 def process_data(df_raw):
@@ -660,9 +675,11 @@ def classify_formalizacao(valor_formalizacao, passado_usina, data_envio_usina):
     return status_f, texto_f
 
 
-def process_propostas(df_raw):
+def process_propostas(df_raw, dept_map=None):
     """Processa a aba 'A.Propostas': normaliza colunas e calcula, para cada
-    proposta, o status de cada uma das 8 etapas e o percentual de conclusão."""
+    proposta, o status de cada uma das 9 etapas e o percentual de conclusão."""
+    if dept_map is None:
+        dept_map = {}
     if df_raw is None:
         return None
 
@@ -719,7 +736,7 @@ def process_propostas(df_raw):
                 status, texto = classify_stage_value(row.get(col))
             if counts and status in ('done', 'na'):
                 completed += 1
-            stages.append({'col': col, 'label': label, 'status': status, 'texto': texto, 'counts': counts})
+            stages.append({'col': col, 'label': label, 'status': status, 'texto': texto, 'counts': counts, 'dept': dept_map.get(col, '')})
 
         n_for_pct = n_stages_pct if n_stages_pct else 1
         passado = row['_PASSADO']
@@ -765,6 +782,7 @@ def render_timeline_row_html(row):
     for st_info in row['_STAGES']:
         status = st_info['status']
         counts = st_info.get('counts', True)
+        dept = html_lib.escape(st_info.get('dept', '') or '')
         label = html_lib.escape(st_info['label'])
         texto_raw = st_info['texto'] if st_info['texto'] else '—'
         texto = html_lib.escape(texto_raw)
@@ -773,6 +791,7 @@ def render_timeline_row_html(row):
         dot_style = f' tl-dot-info' if not counts else ''
         nodes_html.append(
             f'<div class="tl-node" title="{tooltip}">'
+            f'<div class="tl-dept">{dept}</div>'
             f'<div class="tl-dot {status}{dot_style}"></div>'
             f'<div class="tl-label{label_style}">{label}</div>'
             f'<div class="tl-value">{texto}</div>'
@@ -1251,13 +1270,13 @@ def main():
     df_propostas_raw = None
 
     try:
-        df_raw, df_formulas, df_propostas_raw = load_data_from_github()
+        df_raw, df_formulas, df_propostas_raw, dept_map = load_data_from_github()
     except Exception:
         df_raw, df_formulas, df_propostas_raw = None, None, None
 
     if df_raw is None:
         try:
-            df_raw, df_formulas, df_propostas_raw = load_data_from_sharepoint()
+            df_raw, df_formulas, df_propostas_raw, dept_map = load_data_from_sharepoint()
         except Exception:
             df_raw, df_formulas, df_propostas_raw = None, None, None
 
@@ -1277,7 +1296,8 @@ def main():
 
     df, col_names = process_data(df_raw)
     df_unidades, df_usinas = parse_formulas(df_formulas)
-    df_propostas = process_propostas(df_propostas_raw)
+    dept_map = dept_map if 'dept_map' in dir() else {}
+    df_propostas = process_propostas(df_propostas_raw, dept_map)
 
     col_media = col_names.get('media', '')
     if not col_media:
