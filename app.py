@@ -196,6 +196,7 @@ st.markdown("""
     .tl-row:hover { background:#F8FAFD; }
 
     .tl-info { width:230px; flex-shrink:0; padding-top:18px; }
+    .tl-proj { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#4D6BFF; background:#EEF1FB; border:1px solid #CBD8FB; border-radius:10px; padding:2px 8px; display:inline-block; margin-bottom:5px; max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .tl-code { color:#1F2937; font-weight:700; font-size:14px; }
     .tl-desc { color:#64748B; font-size:11.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .tl-meta { color:#94A3B8; font-size:10.5px; margin-top:4px; }
@@ -727,6 +728,17 @@ def process_propostas(df_raw, dept_map=None):
     col_reducao = next((c for c in df.columns if 'REDUÇÃO POTENCIAL' in c.upper()), None)
     col_consumo = next((c for c in df.columns if 'MÉDIA CONSUMO' in c.upper()), None)
     col_envio_usina = next((c for c in df.columns if c.strip().upper() == 'DATA ENVIO P/ USINA'), None)
+    # Projeto: prioridade para "Qual projeto esse item faz parte?", fallback "Nome do Projeto"
+    col_projeto_a = next((c for c in df.columns if 'QUAL PROJETO' in c.upper()), None)
+    col_projeto_b = next((c for c in df.columns if 'NOME DO PROJETO' in c.upper()), None)
+
+    def _extrair_projeto(row):
+        for col in [col_projeto_a, col_projeto_b]:
+            if col and pd.notna(row.get(col)):
+                v = str(row[col]).replace('\n', ' / ').strip()
+                if v and v.lower() not in ('nan', 'none', ''):
+                    return v
+        return ''
 
     df['_DESCRICAO'] = df[col_desc].astype(str).str.strip() if col_desc else ''
     df['_PLANTA'] = df[col_planta].apply(lambda x: normalizar_texto_simples(x)) if col_planta else 'Desconhecida'
@@ -734,6 +746,7 @@ def process_propostas(df_raw, dept_map=None):
     df['_PASSADO'] = df[col_passado].apply(lambda x: normalizar_texto_simples(x, default='')) if col_passado else ''
     df['_REDUCAO'] = df[col_reducao].apply(parse_numero_brasileiro) if col_reducao else 0.0
     df['_CONSUMO'] = df[col_consumo].apply(parse_numero_brasileiro) if col_consumo else 0.0
+    df['_PROJETO'] = df.apply(_extrair_projeto, axis=1)
 
     stage_status_list = []
     pct_list = []
@@ -807,7 +820,13 @@ def render_timeline_row_html(row):
     desc = html_lib.escape(str(row['_DESCRICAO'])[:60])
     badge_label, badge_color = row['_BADGE']
     fonte_txt = html_lib.escape(str(row['_FONTE']))
+    projeto = html_lib.escape(str(row.get('_PROJETO', '') or ''))
     stages = row['_STAGES']
+
+    projeto_html = (
+        f'<div class="tl-proj">{projeto}</div>'
+        if projeto else ''
+    )
 
     # --- Linha 1: pílulas de departamento ---
     depts_html = ''
@@ -860,6 +879,7 @@ def render_timeline_row_html(row):
     row_html = (
         '<div class="tl-row">'
         '<div class="tl-info">'
+        f'{projeto_html}'
         f'<div class="tl-code">{codigo}</div>'
         f'<div class="tl-desc">{desc}</div>'
         f'<div class="tl-meta">{fonte_txt}</div>'
@@ -1513,9 +1533,25 @@ def main():
             with fcol2:
                 sel_fontes = st.multiselect("Fonte:", fontes_disp, default=fontes_disp, key="prop_fonte")
 
+            # Filtro de projeto — só exibe quando há projetos preenchidos
+            projetos_disp = sorted([p for p in df_propostas['_PROJETO'].unique() if p])
+            sel_projetos = projetos_disp  # padrão: todos
+            if projetos_disp:
+                sel_projetos = st.multiselect(
+                    "Projeto:",
+                    projetos_disp,
+                    default=projetos_disp,
+                    key="prop_projeto",
+                    help="Filtra por projeto. Um projeto pode conter várias bobinas.",
+                )
+
             df_f = df_propostas[
                 df_propostas['_PLANTA'].isin(sel_plantas) & df_propostas['_FONTE'].isin(sel_fontes)
             ].copy()
+
+            # Aplica filtro de projeto se houver projetos selecionados
+            if projetos_disp and sel_projetos:
+                df_f = df_f[df_f['_PROJETO'].isin(sel_projetos) | (df_f['_PROJETO'] == '')]
 
             st.markdown("  ", unsafe_allow_html=True)
 
