@@ -197,6 +197,7 @@ st.markdown("""
 
     .tl-info { width:230px; flex-shrink:0; padding-top:18px; }
     .tl-proj { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#4D6BFF; background:#EEF1FB; border:1px solid #CBD8FB; border-radius:10px; padding:2px 8px; display:inline-block; margin-bottom:5px; max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-proj.tl-proj-empty { color:#94A3B8; background:#F8FAFC; border-color:#E2E6F0; font-weight:500; font-style:italic; letter-spacing:0; }
     .tl-code { color:#1F2937; font-weight:700; font-size:14px; }
     .tl-desc { color:#64748B; font-size:11.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .tl-meta { color:#94A3B8; font-size:10.5px; margin-top:4px; }
@@ -825,7 +826,8 @@ def render_timeline_row_html(row):
 
     projeto_html = (
         f'<div class="tl-proj">{projeto}</div>'
-        if projeto else ''
+        if projeto else
+        '<div class="tl-proj tl-proj-empty">Nome do projeto não informado</div>'
     )
 
     # --- Linha 1: pílulas de departamento ---
