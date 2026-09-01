@@ -717,8 +717,17 @@ def process_propostas(df_raw, dept_map=None):
         return None
 
     # Evita contagens duplicadas quando o mesmo Código Delga aparece mais de
-    # uma vez na planilha (mantém a primeira ocorrência).
-    df = df.drop_duplicates(subset=[col_codigo], keep='first')
+    # uma vez na planilha. Prioriza a linha com mais dados (SIM > N/A > NÃO),
+    # garantindo que a linha com 'SIM' em PASSADO PARA USINA seja mantida.
+    _col_pass_tmp = next((c for c in df.columns if 'PASSADO PARA USINA' in c.upper()), None)
+    if _col_pass_tmp:
+        _rank = {'SIM': 2, 'N/A': 1, 'NÃO': 0, 'NAO': 0}
+        df['_dup_rank'] = df[_col_pass_tmp].apply(lambda x: _rank.get(str(x).strip().upper(), 0))
+        df = df.sort_values('_dup_rank', ascending=True)
+        df = df.drop_duplicates(subset=[col_codigo], keep='last')
+        df = df.drop(columns=['_dup_rank'])
+    else:
+        df = df.drop_duplicates(subset=[col_codigo], keep='first')
 
     df = df.rename(columns={col_codigo: 'CÓDIGO DELGA'})
 
@@ -736,7 +745,9 @@ def process_propostas(df_raw, dept_map=None):
     def _extrair_projeto(row):
         for col in [col_projeto_a, col_projeto_b]:
             if col and pd.notna(row.get(col)):
-                v = str(row[col]).replace('\n', ' / ').strip()
+                # Pega só a primeira linha — anotações como "(Reprovado)" ficam
+                # na segunda linha e não devem criar um projeto separado no filtro.
+                v = str(row[col]).split('\n')[0].strip()
                 if v and v.lower() not in ('nan', 'none', ''):
                     return v
         return ''
