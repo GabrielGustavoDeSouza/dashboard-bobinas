@@ -13,7 +13,6 @@ import requests
 import io
 import base64
 from datetime import datetime
-import streamlit.components.v1 as components
 
 # ============================================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -644,81 +643,6 @@ def parse_formulas(df_formulas):
 # ============================================================
 # FUNÇÕES DA ABA "A.Propostas" (Acompanhamento)
 # ============================================================
-
-def get_flow_stage(pct: int) -> int:
-    """Retorna o quadrante do Fluxo Processo BSW com base no % concluído."""
-    if pct <= 0:  return 0
-    if pct <= 25: return 1
-    if pct <= 50: return 2
-    if pct <= 75: return 3
-    return 4
-
-
-def fluxo_svg(active: int) -> str:
-    """Gera SVG do Fluxo Processo BSW com o quadrante 'active' destacado em verde."""
-    quadrants = [
-        dict(n='1. ÁREA TÉCNICA', s='(Análise e Proposta)', hc='#1D4ED8', bc='#DBEAFE',
-             items=['INÍCIO','Análise Técnica','Elaboração da Proposta','Encaminhamento p/ Compras','Alteração Técnica no Sistema']),
-        dict(n='2. ÁREA COMERCIAL', s='(Negociação)', hc='#B91C1C', bc='#FEE2E2',
-             items=['Consulta à Usina','◇ Consulta Aprovada?','Negociação Comercial','◇ Negociação Aprovada?','Acordo Comercial Delga x Usina','Monitoramento da Alteração']),
-        dict(n='3. LOGÍSTICA / PCP', s='(Planejamento e Confirmação)', hc='#6D28D9', bc='#EDE9FE',
-             items=['Operação da Usina','Confirmação PCP Corporativo','PCP Planta (Planejamento)','Planejamento da Entrega','Planejamento da Produção']),
-        dict(n='4. MANUFATURA', s='(Execução)', hc='#15803D', bc='#DCFCE7',
-             items=['Liberação para Fabricação','Produção','✓ FIM']),
-    ]
-    W, H, QW, QH = 680, 360, 155, 268
-    QX0, QY0, GAP = 10, 62, 7
-    parts = [f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:660px;max-width:100%">',
-             f'<rect width="{W}" height="{H}" rx="10" fill="#F8FAFC"/>',
-             f'<text x="{W//2}" y="20" text-anchor="middle" font-family="Segoe UI,Arial" font-weight="900" font-size="13" fill="#1F2937">DELGA — FLUXO PROCESSO BSW</text>',
-             f'<text x="{W//2}" y="36" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" fill="#64748B">Objetivo: Garantir que todas as etapas sejam concluídas e validadas até o início da produção.</text>',
-             f'<line x1="10" y1="45" x2="{W-10}" y2="45" stroke="#E2E6F0" stroke-width="1"/>']
-    for i, q in enumerate(quadrants):
-        x = QX0 + i * (QW + GAP)
-        is_active = (i + 1 == active)
-        bc = q['bc'] if is_active else q['bc'] + '55'
-        border_c = '#16A34A' if is_active else q['hc'] + '33'
-        border_w = '2.5' if is_active else '1'
-        op = '1' if is_active else '0.5'
-        parts.append(f'<rect x="{x}" y="{QY0}" width="{QW}" height="{QH}" rx="7" fill="{bc}" stroke="{border_c}" stroke-width="{border_w}"/>')
-        parts.append(f'<rect x="{x}" y="{QY0}" width="{QW}" height="34" rx="7" fill="{q["hc"]}" opacity="{op}"/>')
-        parts.append(f'<rect x="{x}" y="{QY0+22}" width="{QW}" height="12" fill="{q["hc"]}" opacity="{op}"/>')
-        parts.append(f'<text x="{x+QW//2}" y="{QY0+14}" text-anchor="middle" font-family="Segoe UI,Arial" font-weight="700" font-size="9" fill="#fff">{q["n"]}</text>')
-        parts.append(f'<text x="{x+QW//2}" y="{QY0+31}" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7" fill="#ffffffcc">{q["s"]}</text>')
-        for j, item in enumerate(q['items']):
-            iy = QY0 + 42 + j * 34
-            is_diamond = item.startswith('◇')
-            lbl = item.replace('◇ ', '')
-            ic = q['hc'] if is_active else q['hc'] + '66'
-            item_op = '0.8' if is_active else '0.35'
-            txt_fill = '#1F2937' if is_active else '#94A3B8'
-            if is_diamond:
-                cx, cy = x + QW // 2, iy + 9
-                pts = f"{cx},{cy-10} {cx+13},{cy} {cx},{cy+10} {cx-13},{cy}"
-                parts.append(f'<polygon points="{pts}" fill="{ic}" opacity="{item_op}"/>')
-                parts.append(f'<text x="{cx}" y="{iy+30}" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" fill="{txt_fill}">{lbl}</text>')
-            else:
-                stroke_op = '0.5' if is_active else '0.2'
-                rect_op = '0.13' if is_active else '0.06'
-                fs = '7' if len(lbl) > 22 else '8'
-                parts.append(f'<rect x="{x+7}" y="{iy}" width="{QW-14}" height="19" rx="4" fill="{ic}" opacity="{rect_op}" stroke="{ic}" stroke-width="1" stroke-opacity="{stroke_op}"/>')
-                parts.append(f'<text x="{x+QW//2}" y="{iy+12}" text-anchor="middle" font-family="Segoe UI,Arial" font-size="{fs}" fill="{txt_fill}">{lbl}</text>')
-            if j < len(q['items']) - 1:
-                arr_op = '0.5' if is_active else '0.2'
-                parts.append(f'<line x1="{x+QW//2}" y1="{iy+19}" x2="{x+QW//2}" y2="{iy+24}" stroke="{ic}" stroke-width="1.5" opacity="{arr_op}"/>')
-                parts.append(f'<polygon points="{x+QW//2-3},{iy+22} {x+QW//2+3},{iy+22} {x+QW//2},{iy+26}" fill="{ic}" opacity="{arr_op}"/>')
-        if is_active:
-            parts.append(f'<rect x="{x+6}" y="{QY0+QH+3}" width="{QW-12}" height="17" rx="8" fill="#16A34A"/>')
-            parts.append(f'<text x="{x+QW//2}" y="{QY0+QH+14}" text-anchor="middle" font-family="Segoe UI,Arial" font-weight="700" font-size="8" fill="#fff">▶ ETAPA ATUAL</text>')
-        if i < 3:
-            ax = x + QW + GAP // 2
-            ay = QY0 + QH // 2
-            parts.append(f'<line x1="{ax-2}" y1="{ay}" x2="{ax+2}" y2="{ay}" stroke="#94A3B8" stroke-width="1.5"/>')
-            parts.append(f'<polygon points="{ax+2},{ay-3} {ax+5},{ay} {ax+2},{ay+3}" fill="#94A3B8"/>')
-    parts.append('</svg>')
-    return ''.join(parts)
-
-
 def classify_stage_value(v):
     """Classifica o valor de uma célula de etapa em:
     done (data já passou), planned (data futura), na (não se aplica),
@@ -937,24 +861,16 @@ def render_timeline_row_html(row):
         else:
             break
 
-    # Última bolinha pintada → recebe tooltip do Fluxo Processo BSW
-    last_filled = -1
-    for idx_s, st in enumerate(stages):
-        if st['status'] in ('done', 'na'):
-            last_filled = idx_s
-    flow_stage = get_flow_stage(pct)
     spine_html = ''
     for i, st in enumerate(stages):
         status = st['status']
         counts = st.get('counts', True)
-        is_last = (i == last_filled and flow_stage > 0)
-        dot_cls = f'tl-dot {status}' + (' tl-dot-info' if not counts else '') + (' tl-has-tooltip' if is_last else '')
-        tooltip_attr = f' data-fstage="{flow_stage}"' if is_last else ''
+        dot_cls = f'tl-dot {status}' + (' tl-dot-info' if not counts else '')
         # conector à esquerda da bolinha (exceto no primeiro)
         if i > 0:
             conn_cls = 'tl-connector filled' if i < filled_up_to else 'tl-connector'
             spine_html += f'<div class="{conn_cls}"></div>'
-        spine_html += f'<div class="{dot_cls}"{tooltip_attr}></div>'
+        spine_html += f'<div class="{dot_cls}"></div>'
 
     # --- Linha 3: labels e valores ---
     labels_html = ''
@@ -1737,58 +1653,6 @@ def main():
                     full_html += render_acompanhamento_block(planta, df_grupo)
 
                 st.markdown(full_html, unsafe_allow_html=True)
-
-# Tooltip interativo do Fluxo Processo BSW
-# (components.html executa num iframe que acessa o DOM pai)
-# Pré-gera os 4 SVGs para não precisar de JS pesado
-svgs_json = '{' + ','.join(f'"{i}":{repr(fluxo_svg(i))}' for i in range(1,5)) + '}'
-components.html(f"""
-<script>
-(function(){{
-  var SVGS={svgs_json};
-  function init(){{
-    var par=window.parent.document;
-    // Remove tooltip anterior se existir
-    var old=par.getElementById('bsw-flow-tooltip');
-    if(old) old.remove();
-    var tip=par.createElement('div');
-    tip.id='bsw-flow-tooltip';
-    tip.style.cssText='display:none;position:fixed;z-index:99999;pointer-events:none;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.22);padding:8px;';
-    par.body.appendChild(tip);
-    function pos(e){{
-      var tw=690,th=375,M=14;
-      var x=e.clientX+M, y=e.clientY-th/2;
-      if(x+tw>window.parent.innerWidth-M) x=e.clientX-tw-M;
-      if(y<M) y=M;
-      if(y+th>window.parent.innerHeight-M) y=window.parent.innerHeight-th-M;
-      tip.style.left=x+'px'; tip.style.top=y+'px';
-    }}
-    par.querySelectorAll('.tl-has-tooltip').forEach(function(dot){{
-      var nd=dot.cloneNode(true);
-      dot.parentNode.replaceChild(nd,dot);
-      var stage=nd.dataset.fstage;
-      if(!stage||!SVGS[stage]) return;
-      nd.addEventListener('mouseenter',function(e){{
-        tip.innerHTML=SVGS[stage];
-        tip.style.display='block';
-        pos(e);
-      }});
-      nd.addEventListener('mousemove',pos);
-      nd.addEventListener('mouseleave',function(){{ tip.style.display='none'; }});
-    }});
-  }}
-  // Aguarda Streamlit renderizar o timeline
-  if(window.parent.document.readyState==='complete') init();
-  else window.parent.addEventListener('load',init);
-  // Re-init quando Streamlit re-renderiza (MutationObserver)
-  var ob=new MutationObserver(function(ml){{
-    for(var m of ml) for(var n of m.addedNodes)
-      if(n.nodeType===1&&(n.classList&&n.classList.contains('tl-has-tooltip')||n.querySelector&&n.querySelector('.tl-has-tooltip'))) {{ init(); return; }}
-  }});
-  ob.observe(window.parent.document.body,{{childList:true,subtree:true}});
-}})();
-</script>
-""", height=0)
 
 
 if __name__ == "__main__":
