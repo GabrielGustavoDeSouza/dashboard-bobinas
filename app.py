@@ -1738,47 +1738,59 @@ def main():
 
                 st.markdown(full_html, unsafe_allow_html=True)
 
-                # ── Tooltip Fluxo Processo BSW ──
-                # Pré-gera os 4 SVGs em Python e injeta JS via iframe
-                _svgs = {str(i): fluxo_svg(i) for i in range(1, 5)}
-                import json as _json
-                _svgs_js = _json.dumps(_svgs)
-                components.html(
-                    "<script>(function(){{"
-                    "var SVGS=" + _svgs_js + ";"
-                    "function init(){{"
-                    "var par=window.parent.document;"
-                    "var old=par.getElementById('bsw-flow-tooltip');"
-                    "if(old)old.remove();"
-                    "var tip=par.createElement('div');"
-                    "tip.id='bsw-flow-tooltip';"
-                    "tip.style.cssText='display:none;position:fixed;z-index:99999;pointer-events:none;"
-                    "background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.22);padding:8px;';"
-                    "par.body.appendChild(tip);"
-                    "function pos(e){{"
-                    "var tw=690,th=375,M=14;"
-                    "var x=e.clientX+M,y=e.clientY-th/2;"
-                    "if(x+tw>window.parent.innerWidth-M)x=e.clientX-tw-M;"
-                    "if(y<M)y=M;"
-                    "if(y+th>window.parent.innerHeight-M)y=window.parent.innerHeight-th-M;"
-                    "tip.style.left=x+'px';tip.style.top=y+'px';}}"
-                    "par.querySelectorAll('.tl-has-tooltip').forEach(function(dot){{"
-                    "var nd=dot.cloneNode(true);dot.parentNode.replaceChild(nd,dot);"
-                    "var stage=nd.dataset.fstage;"
-                    "if(!stage||!SVGS[stage])return;"
-                    "nd.addEventListener('mouseenter',function(e){{"
-                    "tip.innerHTML=SVGS[stage];tip.style.display='block';pos(e);}});"
-                    "nd.addEventListener('mousemove',pos);"
-                    "nd.addEventListener('mouseleave',function(){{tip.style.display='none';}});}});}}"
-                    "var ob=new MutationObserver(function(ml){{"
-                    "for(var m of ml)for(var n of m.addedNodes)"
-                    "if(n.nodeType===1&&(n.classList&&n.classList.contains('tl-has-tooltip')"
-                    "||n.querySelector&&n.querySelector('.tl-has-tooltip'))){{"
-                    "init();return;}}}}); "
-                    "ob.observe(window.parent.document.body,{{childList:true,subtree:true}});"
-                    "init();}})();</script>",
-                    height=0,
+                # Embutir SVGs como divs ocultas no HTML e ler com JS (sem JSON gigante)
+                _svg_divs = "".join(
+                    f'<div id="bsw-fluxo-{i}" style="display:none">{fluxo_svg(i)}</div>'
+                    for i in range(1, 5)
                 )
+                st.markdown(full_html + _svg_divs, unsafe_allow_html=True)
+
+                _js = """
+<script>
+(function(){
+  var _att=0,_max=15,_ms=350;
+  function init(){
+    _att++;
+    var par=window.parent.document;
+    var dots=par.querySelectorAll(".tl-has-tooltip");
+    if(!dots||dots.length===0){if(_att<_max)setTimeout(init,_ms);return;}
+    var old=par.getElementById("bsw-flow-tip");
+    if(old)old.remove();
+    var tip=par.createElement("div");
+    tip.id="bsw-flow-tip";
+    tip.style.cssText="display:none;position:fixed;z-index:99999;"
+      +"pointer-events:none;background:#fff;border-radius:12px;"
+      +"box-shadow:0 8px 32px rgba(0,0,0,.22);padding:8px;";
+    par.body.appendChild(tip);
+    function pos(e){
+      var tw=695,th=378,M=14;
+      var x=e.clientX+M,y=e.clientY-th/2;
+      if(x+tw>window.parent.innerWidth-M)x=e.clientX-tw-M;
+      if(y<M)y=M;
+      if(y+th>window.parent.innerHeight-M)y=window.parent.innerHeight-th-M;
+      tip.style.left=x+"px";tip.style.top=y+"px";
+    }
+    dots.forEach(function(dot){
+      var nd=dot.cloneNode(true);dot.parentNode.replaceChild(nd,dot);
+      var stage=nd.dataset.fstage;
+      var el=par.getElementById("bsw-fluxo-"+stage);
+      if(!el)return;
+      var html=el.innerHTML;
+      nd.addEventListener("mouseenter",function(e){tip.innerHTML=html;tip.style.display="block";pos(e);});
+      nd.addEventListener("mousemove",pos);
+      nd.addEventListener("mouseleave",function(){tip.style.display="none";});
+    });
+  }
+  setTimeout(init,400);
+  new MutationObserver(function(ml){
+    for(var m of ml)for(var n of m.addedNodes)
+      if(n.nodeType===1&&n.querySelector&&n.querySelector(".tl-has-tooltip")){_att=0;setTimeout(init,400);return;}
+  }).observe(window.parent.document.body,{childList:true,subtree:true});
+})();
+</script>
+"""
+                components.html(_js, height=0)
+
 
 
 if __name__ == "__main__":
