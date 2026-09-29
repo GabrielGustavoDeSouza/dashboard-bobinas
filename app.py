@@ -40,6 +40,7 @@ GITHUB_REPO = "GabrielGustavoDeSouza/dashboard-bobinas"
 GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
+ADMIN_PASSWORD_PADRAO = "M@ster"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -1443,10 +1444,9 @@ def sidebar():
 
         st.markdown("#### 🔐 Área do Administrador")
         with st.expander("Atualizar Dados (requer senha)", expanded=False):
-            admin_pwd = get_secret("ADMIN_PASSWORD")
-            if not admin_pwd:
-                st.info("Defina ADMIN_PASSWORD nos Secrets do app para habilitar.")
-            else:
+            # senha: usa ADMIN_PASSWORD dos Secrets se existir; senão, a senha de sempre
+            admin_pwd = get_secret("ADMIN_PASSWORD") or ADMIN_PASSWORD_PADRAO
+            if True:
                 senha = st.text_input("Senha:", type="password", key="admin_pwd")
                 if senha and not hmac.compare_digest(senha, str(admin_pwd)):
                     st.error("Senha incorreta.")
