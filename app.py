@@ -1140,7 +1140,69 @@ def ordem_categorias(serie):
     return ordem, cont
 
 
-def create_donut(serie, titulo, centro_txt, filtro_id, ordem, cores, selecionado=None):
+def _quebra(txt, n=34):
+    """Quebra rótulos longos em até 2 linhas (prioriza o ' - ')."""
+    if len(txt) <= n:
+        return txt
+    if " - " in txt:
+        a, b = txt.split(" - ", 1)
+        b = b if len(b) <= n else b[:n - 1] + "…"
+        return f"{a}<br>{b}"
+    return txt[:n] + "<br>" + (txt[n:2 * n - 1] + ("…" if len(txt) > 2 * n - 1 else ""))
+
+
+def pareto_altura(serie):
+    return int(min(620, max(360, serie.nunique() * 40 + 130)))
+
+
+def create_pareto(serie, titulo, selecionado=None, height=420):
+    """Pareto horizontal: barras em ordem decrescente + linha de % acumulado.
+    Barras até 80% acumulado em azul forte ('poucos vitais'); 'Não informado' sempre no fim, em cinza."""
+    cont = serie.value_counts()
+    cats = [c for c in cont.index if c != NAO_INF]
+    if NAO_INF in cont.index:
+        cats.append(NAO_INF)
+    if not cats:
+        return None
+    vals = [int(cont[c]) for c in cats]
+    total = sum(vals)
+    acum, soma = [], 0
+    for v in vals:
+        soma += v
+        acum.append(soma / total * 100)
+    rot, vistos = [], set()
+    for c in cats:
+        r = _quebra(c)
+        while r in vistos:
+            r += " "
+        vistos.add(r)
+        rot.append(r)
+    cores = []
+    for c, ac, v in zip(cats, acum, vals):
+        base = COR_NAO_INF if c == NAO_INF else ("#4D6BFF" if ac - v / total * 100 < 80 else "#A5B4FC")
+        cores.append(rgba(base, 1.0 if selecionado in (None, c) else 0.25))
+    fig = go.Figure()
+    fig.add_bar(y=rot, x=vals, orientation="h", customdata=cats, marker=dict(color=cores),
+                text=[f"{v}" for v in vals], textposition="outside", cliponaxis=False,
+                textfont=dict(color=COR["texto"], size=12),
+                hovertemplate="<b>%{customdata}</b><br>%{x} propostas<extra></extra>")
+    fig.add_scatter(y=rot, x=acum, xaxis="x2", mode="lines+markers", customdata=cats,
+                    line=dict(color="#F59E0B", width=2), marker=dict(size=7, color="#F59E0B"),
+                    hovertemplate="<b>%{customdata}</b><br>acumulado: %{x:.0f}%<extra></extra>")
+    fig = _layout(fig, f"{titulo}<br><sup style='color:#94A3B8'>barras = propostas · linha laranja = % acumulado · "
+                       f"clique numa barra para filtrar</sup>",
+                  height=height, showlegend=False, clickmode="event+select", bargap=0.3,
+                  yaxis=dict(autorange="reversed", automargin=True, tickfont=dict(size=11, color="#334155"), **GRID),
+                  xaxis=dict(title=None, range=[0, max(vals) * 1.15], **GRID),
+                  xaxis2=dict(overlaying="x", side="top", range=[0, 105], ticksuffix="%", showgrid=False,
+                              tickvals=[0, 20, 40, 60, 80, 100], ticktext=["0%", "20%", "40%", "60%", "80%", "100%"],
+                              tickfont=dict(color="#F59E0B", size=10)),
+                  margin=dict(l=10, r=20, t=90, b=20))
+    fig.add_vline(x=80, xref="x2", line=dict(color="#F59E0B", width=1, dash="dot"))
+    return fig
+
+
+def create_donut(serie, titulo, centro_txt, filtro_id, ordem, cores, selecionado=None, height=340):
     """Pizza (rosca) clicável: clique numa fatia ou na legenda para filtrar."""
     cont = serie.value_counts()
     ordem = [c for c in ordem if cont.get(c, 0)]
@@ -1159,7 +1221,7 @@ def create_donut(serie, titulo, centro_txt, filtro_id, ordem, cores, selecionado
         hovertemplate="<b>%{customdata}</b><br>%{value} propostas · %{percent}<extra></extra>",
     ))
     fig.update_layout(
-        **PLOTLY_LAYOUT, height=340,
+        **PLOTLY_LAYOUT, height=height,
         title=dict(text=f"{titulo}<br><sup style='color:#94A3B8'>clique numa fatia ou na legenda para filtrar</sup>",
                    font=dict(size=14, color=COR["texto"]), x=0.03),
         meta={"bsw": filtro_id, "map": {lab: i for i, lab in enumerate(labels)}},
@@ -1269,6 +1331,13 @@ def _cb_filtro(filtro, valor):
         st.session_state["f_area"] = None
 
 
+def _cb_area(chart_key):
+    v = _valor_clicado(chart_key)
+    if v:
+        st.session_state["f_area"] = None if st.session_state.get("f_area") == v else v
+    _nova_rodada()
+
+
 def _cb_limpar():
     st.session_state["acomp_unidade"] = "Todas"
     st.session_state["f_viab"] = None
@@ -1372,20 +1441,22 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     st.write("")
 
     # ---------- 4. Pizzas (Viabilidade -> Área pendente) ----------
-    p1, p2 = st.columns(2)
+    altura = pareto_altura(df_pend["_AREA_CAT"]) if len(df_pend) else 380  # mesma altura nos dois
+    p1, p2 = st.columns([2, 3])
     with p1:
         render_chart(create_donut(df_u["_VIAB_CAT"], "Viabilidade técnica", "PROPOSTAS", "f_viab",
-                                  ordem_viab, cores_viab, ss["f_viab"]), "Sem propostas.", key=f"pz_viab_{n}")
+                                  ordem_viab, cores_viab, ss["f_viab"], height=altura), "Sem propostas.", key=f"pz_viab_{n}")
     with p2:
-        fig_area = create_donut(df_pend["_AREA_CAT"], "Área pendente de atuação", "PENDENTES", "f_area",
-                                ordem_area, cores_area, ss["f_area"])
+        k_area = f"pz_area_{n}"
+        fig_area = create_pareto(df_pend["_AREA_CAT"], "Área pendente de atuação (Pareto)", ss["f_area"], altura)
         if fig_area is not None:
-            fig_area.layout.title.text = ("Área pendente de atuação<br><sup style='color:#94A3B8'>só propostas "
-                                          "não concluídas e não inviáveis · clique para filtrar</sup>")
-        render_chart(fig_area, "Nenhuma proposta pendente: todas estão concluídas ou inviáveis.", key=f"pz_area_{n}")
+            fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes<br><sup style='color:#94A3B8'>"
+                                          "sem concluídas e inviáveis · linha laranja = % acumulado · "
+                                          "clique numa barra para filtrar</sup>")
+        render_chart(fig_area, "Nenhuma proposta pendente: todas estão concluídas ou inviáveis.", key=k_area,
+                     on_select=lambda: _cb_area(k_area))
     # botões ocultos na mesma ordem das fatias (índice -> valor)
     ov = [c for c in ordem_viab if (df_u["_VIAB_CAT"] == c).any()]
-    oa = [c for c in ordem_area if (df_pend["_AREA_CAT"] == c).any()]
 
     # ---------- 5. Volume total x analisado ----------
     k_vol = f"acomp_vol_{n}"
@@ -1403,7 +1474,6 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     if df_a.empty:
         st.info("Nenhuma proposta para os filtros selecionados.")
         _botoes_ocultos("f_viab", ov)
-        _botoes_ocultos("f_area", oa)
         return
     st.markdown(
         '<div class="legend">'
@@ -1422,7 +1492,6 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     st.markdown("".join(blocos) + fluxo_tooltip_html(), unsafe_allow_html=True)
     # botões invisíveis acionados pelo clique nas pizzas (ficam no fim para não ocupar espaço)
     _botoes_ocultos("f_viab", ov)
-    _botoes_ocultos("f_area", oa)
 
 
 # ============================================================
