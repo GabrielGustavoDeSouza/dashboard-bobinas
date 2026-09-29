@@ -14,6 +14,8 @@ import base64
 import hmac
 import html as html_lib
 import io
+import json
+import re
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -36,8 +38,10 @@ st.set_page_config(
 
 GITHUB_REPO = "GabrielGustavoDeSouza/dashboard-bobinas"
 GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
+GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
+LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
 AZUL = "#1400FF"
 UNIDADE_COLORS = {"Ferraz": "#1E88E5", "Diadema": "#43A047", "Jarinu": "#FB8C00", "Sul": "#8E24AA"}
@@ -152,6 +156,14 @@ div[data-baseweb="input"], div[data-baseweb="base-input"] { background:#FFFFFF !
 div[data-baseweb="input"] input { background:#FFFFFF !important; color:#1F2937 !important; -webkit-text-fill-color:#1F2937 !important; }
 div[data-baseweb="input"] svg { fill:#94A3B8 !important; }
 div[data-baseweb="input"] button { background:#FFFFFF !important; }
+[data-testid="stNumberInput"] input { background:#FFFFFF !important; color:#1F2937 !important; -webkit-text-fill-color:#1F2937 !important; }
+[data-testid="stNumberInput"] button { background:#F8FAFD !important; color:#475569 !important; border-color:#E2E6F0 !important; }
+[data-testid="stNumberInput"] label p { color:#475569 !important; }
+[data-testid="stNumberInput"] div:has(> input) { background:#FFFFFF !important; border-color:#E2E6F0 !important; }
+.stButton > button[kind="secondary"] { background:#FFFFFF !important; border:1px solid #E2E6F0 !important; }
+.stButton > button[kind="secondary"] * { color:#1F2937 !important; }
+.stButton > button[kind="secondary"]:hover { border-color:#1400FF !important; }
+.stButton > button[kind="secondary"]:hover * { color:#1400FF !important; }
 div[data-testid="stFileUploaderDropzone"] { background:#FFFFFF !important; border:2px dashed #E2E6F0 !important; }
 div[data-testid="stFileUploaderDropzone"] * { color:#475569 !important; fill:#94A3B8 !important; }
 div[data-testid="stFileUploaderDropzone"] button { background:#FFFFFF !important; border:1px solid #E2E6F0 !important; }
@@ -353,9 +365,10 @@ def kpi_row(items):
     cells = []
     for label, value, sub, color in items:
         sub_html = f'<div class="kpi-s">{esc(sub)}</div>' if sub else ""
+        estilo_v = ' style="font-size:20px"' if len(str(value)) > 12 else ""  # valores longos (R$)
         cells.append(
             f'<div class="kpi" style="--c:{color or COR["azul"]}">'
-            f'<div class="kpi-l">{esc(label)}</div><div class="kpi-v">{esc(value)}</div>{sub_html}</div>'
+            f'<div class="kpi-l">{esc(label)}</div><div class="kpi-v"{estilo_v}>{esc(value)}</div>{sub_html}</div>'
         )
     st.markdown(f'<div class="kpi-row">{"".join(cells)}</div>', unsafe_allow_html=True)
 
@@ -451,25 +464,72 @@ def fetch_from_local():
     return None, None
 
 
-def save_data_to_github(file_bytes, filename):
+def _put_github(path, file_bytes, message):
     token = get_secret("GITHUB_TOKEN")
     if not token:
         return False, "Token do GitHub não configurado nos Secrets."
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_DATA_PATH}"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     r = requests.get(url, headers=_gh_headers(token), params={"ref": GITHUB_BRANCH}, timeout=30)
     sha = r.json().get("sha") if r.status_code == 200 else None
-    payload = {
-        "message": f"Atualização de dados: {filename} ({datetime.now().strftime('%d/%m/%Y %H:%M')})",
-        "content": base64.b64encode(file_bytes).decode("utf-8"),
-        "branch": GITHUB_BRANCH,
-    }
+    payload = {"message": message, "content": base64.b64encode(file_bytes).decode("utf-8"), "branch": GITHUB_BRANCH}
     if sha:
         payload["sha"] = sha
     r = requests.put(url, headers=_gh_headers(token), json=payload, timeout=60)
     if r.status_code in (200, 201):
+        return True, "ok"
+    return False, f"Erro ao salvar: {r.status_code} - {r.json().get('message', '')}"
+
+
+def save_data_to_github(file_bytes, filename):
+    ok, msg = _put_github(GITHUB_DATA_PATH, file_bytes,
+                          f"Atualização de dados: {filename} ({datetime.now().strftime('%d/%m/%Y %H:%M')})")
+    if ok:
         fetch_from_github.clear()
         return True, "Dados atualizados com sucesso!"
-    return False, f"Erro ao salvar: {r.status_code} - {r.json().get('message', '')}"
+    return False, msg
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def load_valores_bsw():
+    """Valor validado de BSW por unidade: {"Ferraz": 123.0, ...}. GitHub -> arquivo local -> vazio."""
+    token = get_secret("GITHUB_TOKEN")
+    if token:
+        try:
+            r = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_VALORES_PATH}",
+                             headers=_gh_headers(token, raw=True), params={"ref": GITHUB_BRANCH}, timeout=20)
+            if r.status_code == 200:
+                return {k: float(v) for k, v in json.loads(r.content).get("valores", {}).items()}
+        except Exception:
+            pass
+    try:
+        if LOCAL_VALORES_PATH.exists():
+            return {k: float(v) for k, v in json.loads(LOCAL_VALORES_PATH.read_text()).get("valores", {}).items()}
+    except Exception:
+        pass
+    return {}
+
+
+def save_valores_bsw(valores):
+    conteudo = json.dumps({"valores": valores, "atualizado_em": datetime.now().strftime("%d/%m/%Y %H:%M")},
+                          ensure_ascii=False, indent=2).encode("utf-8")
+    if get_secret("GITHUB_TOKEN"):
+        ok, msg = _put_github(GITHUB_VALORES_PATH, conteudo,
+                              f"Valor validado BSW ({datetime.now().strftime('%d/%m/%Y %H:%M')})")
+    else:
+        try:
+            LOCAL_VALORES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            LOCAL_VALORES_PATH.write_bytes(conteudo)
+            ok, msg = True, "ok"
+        except Exception as e:
+            ok, msg = False, f"Erro ao salvar: {e}"
+    if ok:
+        load_valores_bsw.clear()
+        return True, "Valores salvos com sucesso!"
+    return False, msg
+
+
+def fmt_brl(v):
+    return f"R$ {fmt_num(v, 2)}"
 
 
 def find_header_row(buf, sheet_name, markers, max_scan=15):
@@ -646,6 +706,11 @@ def classify_formalizacao(valor, data_envio_usina):
 
 
 NAO_INF = "Não informado"
+_RE_DECIDIDA = re.compile(r"(^|[^A-Z])(IN)?VIAVEL")  # Viável, Viável com restrições, Inviável
+
+
+def viab_decidida(valor):
+    return valor != NAO_INF and bool(_RE_DECIDIDA.search(_norm(valor)))
 
 
 def categorias(serie):
@@ -1219,7 +1284,7 @@ def _botoes_ocultos(filtro, valores):
             st.button(f"BSWF|{filtro}|{i}", key=f"bswf_{filtro}_{i}", on_click=_cb_filtro, args=(filtro, v))
 
 
-def tab_acompanhamento(df_p, df_unidades):
+def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     if df_p is None or df_p.empty:
         st.info('Aba "A.Propostas" não encontrada no Excel. Envie um arquivo que contenha essa aba para ver o acompanhamento.')
         return
@@ -1271,7 +1336,9 @@ def tab_acompanhamento(df_p, df_unidades):
 
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
     df_v = df_u if not ss["f_viab"] else df_u[df_u["_VIAB_CAT"] == ss["f_viab"]]
-    df_a = df_v if not ss["f_area"] else df_v[df_v["_AREA_CAT"] == ss["f_area"]]
+    # Área pendente: só propostas ainda sem viabilidade definida (Viável / Viável c/ restrições / Inviável saem)
+    df_pend = df_v[~df_v["_VIAB_CAT"].apply(viab_decidida)]
+    df_a = df_v if not ss["f_area"] else df_pend[df_pend["_AREA_CAT"] == ss["f_area"]]
 
     # ---------- 3. Volume da unidade ----------
     if sel == "Todas" or df_unidades.empty:
@@ -1280,6 +1347,16 @@ def tab_acompanhamento(df_p, df_unidades):
         vol_u = df_unidades[df_unidades["unidade"].apply(lambda u: unidade_match(u, sel))]
     v_total = vol_u["peso_total"].sum() if not vol_u.empty else None
     v_anal = vol_u["peso_analisado"].sum() if not vol_u.empty else None
+    # valor validado de BSW (informado na Área do Administrador): soma ou valor da unidade
+    valores_bsw = valores_bsw or {}
+    if sel == "Todas":
+        vals = [v for v in valores_bsw.values() if v]
+        val_sub = f"soma de {len(vals)} unidade(s)" if vals else "informe na Área do Administrador"
+    else:
+        vals = [v for u, v in valores_bsw.items() if v and unidade_match(u, sel)]
+        val_sub = sel.title() if vals else "não informado para esta unidade"
+    val_txt = fmt_brl(sum(vals)) if vals else "—"
+
     nome = "Todas as unidades" if sel == "Todas" else sel.title()
     section(f"{nome} — volume e propostas")
     kpi_row([
@@ -1287,6 +1364,7 @@ def tab_acompanhamento(df_p, df_unidades):
         ("Volume analisado", f"{fmt_num(v_anal)} ton" if v_anal is not None else "—", None, COR["azul"]),
         ("% analisado", f"{fmt_num(v_anal / v_total * 100, 1)}%" if v_total else "—", None, COR["roxo"]),
         ("Propostas", fmt_num(len(df_u)), None, get_unidade_color(sel)),
+        ("Valor validado BSW", val_txt, val_sub, COR["verde"]),
     ])
     st.write("")
 
@@ -1296,12 +1374,16 @@ def tab_acompanhamento(df_p, df_unidades):
         render_chart(create_donut(df_u["_VIAB_CAT"], "Viabilidade técnica", "PROPOSTAS", "f_viab",
                                   ordem_viab, cores_viab, ss["f_viab"]), "Sem propostas.", key=f"pz_viab_{n}")
     with p2:
-        centro = "PROPOSTAS" if not ss["f_viab"] else ss["f_viab"].upper()[:22]
-        render_chart(create_donut(df_v["_AREA_CAT"], "Área pendente de atuação", centro, "f_area",
-                                  ordem_area, cores_area, ss["f_area"]), "Sem propostas.", key=f"pz_area_{n}")
+        fig_area = create_donut(df_pend["_AREA_CAT"], "Área pendente de atuação", "PENDENTES", "f_area",
+                                ordem_area, cores_area, ss["f_area"])
+        if fig_area is not None:
+            fig_area.layout.title.text = ("Área pendente de atuação<br><sup style='color:#94A3B8'>só propostas "
+                                          "sem viabilidade definida · clique para filtrar</sup>")
+        render_chart(fig_area, "Nenhuma proposta pendente: todas já têm viabilidade definida "
+                               "(Viável, Viável com restrições ou Inviável).", key=f"pz_area_{n}")
     # botões ocultos na mesma ordem das fatias (índice -> valor)
     ov = [c for c in ordem_viab if (df_u["_VIAB_CAT"] == c).any()]
-    oa = [c for c in ordem_area if (df_v["_AREA_CAT"] == c).any()]
+    oa = [c for c in ordem_area if (df_pend["_AREA_CAT"] == c).any()]
 
     # ---------- 5. Volume total x analisado ----------
     k_vol = f"acomp_vol_{n}"
@@ -1370,6 +1452,17 @@ def sidebar():
                     st.error("Senha incorreta.")
                 elif senha:
                     st.success("Acesso liberado!")
+                    st.markdown("**💰 Valor validado de BSW (R$)**")
+                    atuais = load_valores_bsw()
+                    novos = {}
+                    for u in UNIDADE_COLORS:
+                        novos[u] = st.number_input(u, min_value=0.0, step=1000.0, format="%.2f",
+                                                   value=float(atuais.get(u, 0.0)), key=f"val_bsw_{u}")
+                    if st.button("💾 Salvar valores", key="salvar_valores"):
+                        ok, msg = save_valores_bsw(novos)
+                        (st.success if ok else st.error)(msg)
+                    st.markdown('<hr style="border-color:#E2E6F0;margin:10px 0">', unsafe_allow_html=True)
+                    st.markdown("**📊 Base de dados (Excel)**")
                     arq = st.file_uploader("Envie o Excel atualizado:", type=["xlsx", "xls"], key="admin_upload")
                     if arq and st.button("📤 Salvar e Publicar Dados", type="primary"):
                         with st.spinner("Salvando dados no servidor..."):
@@ -1437,7 +1530,7 @@ def main():
     with t2:
         tab_analises(df, col_media, df_unidades)
     with t3:
-        tab_acompanhamento(df_prop, df_unidades)
+        tab_acompanhamento(df_prop, df_unidades, load_valores_bsw())
 
 
 # ============================================================
