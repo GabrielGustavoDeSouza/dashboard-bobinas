@@ -987,18 +987,108 @@ def create_group_bar(df, col_media, group_col, title, top_n=10, by_unit_color=Fa
     return _hbar(dist.index, dist.values, cores, title)
 
 
-def create_etapa_chart(df_p):
-    """Das propostas em andamento, quantas estão paradas em cada etapa do processo."""
+def create_status_donut(df_p):
+    """Rosca de status. Cada fatia é selecionável e pode filtrar a lista abaixo."""
+    if df_p is None or df_p.empty:
+        return None
+    cont = df_p["_GRUPO"].value_counts()
+    labels = [g for g, _ in GRUPOS if int(cont.get(g, 0)) > 0]
+    values = [int(cont.get(g, 0)) for g in labels]
+    color_map = dict(GRUPOS)
+    colors = [color_map[g] for g in labels]
+
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values, hole=0.62, sort=False,
+        customdata=labels,
+        marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
+        textinfo="percent", texttemplate="%{percent:.0%}",
+        textfont=dict(size=12, color="#FFFFFF"),
+        hovertemplate="<b>%{label}</b><br>%{value} propostas · %{percent}<extra></extra>",
+        pull=[0.035 if g == "Em andamento" else 0 for g in labels],
+    ))
+    fig.add_annotation(
+        text=f"<b>{len(df_p)}</b><br><span style='font-size:11px;color:#64748B'>propostas</span>",
+        x=0.5, y=0.5, showarrow=False,
+        font=dict(size=19, color=COR["texto"]),
+    )
+    return _layout(
+        fig, "Status das propostas", height=360, showlegend=True,
+        legend=dict(orientation="h", y=-0.06, x=0.5, xanchor="center",
+                    font=dict(color="#64748B", size=11)),
+        margin=dict(l=10, r=10, t=55, b=55),
+    )
+
+
+def create_etapa_donut(df_p):
+    """Rosca das etapas atuais das propostas em andamento."""
+    if df_p is None or df_p.empty:
+        return None
+
     ordem = [s[1] for s in STAGE_DEFS if s[2]]
     cont = df_p.loc[df_p["_GRUPO"] == "Em andamento", "_ETAPA"].value_counts()
-    labels = [e for e in ordem if cont.get(e, 0) > 0]
+    labels = [e for e in ordem if int(cont.get(e, 0)) > 0]
     if not labels:
         return None
-    cor_map = {"Concluído": COR["verde"], "Inviável": COR["vermelho"], "Não enviado à usina": COR["coral"]}
-    labels = labels[::-1]  # primeira etapa no topo
-    vals = [int(cont[e]) for e in labels]
-    return _hbar(labels, vals, [cor_map.get(e, COR["azul"]) for e in labels],
-                 "Em andamento: etapa em que cada proposta está", fmt="%{x} propostas", text=vals)
+
+    values = [int(cont[e]) for e in labels]
+    colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(labels))]
+
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values, hole=0.62, sort=False,
+        customdata=labels,
+        marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
+        textinfo="percent", texttemplate="%{percent:.0%}",
+        textfont=dict(size=11, color="#FFFFFF"),
+        hovertemplate="<b>%{label}</b><br>%{value} propostas · %{percent}<extra></extra>",
+    ))
+    fig.add_annotation(
+        text=f"<b>{sum(values)}</b><br><span style='font-size:11px;color:#64748B'>em andamento</span>",
+        x=0.5, y=0.5, showarrow=False,
+        font=dict(size=18, color=COR["texto"]),
+    )
+    return _layout(
+        fig, "Etapa atual das propostas", height=360, showlegend=True,
+        legend=dict(orientation="h", y=-0.06, x=0.5, xanchor="center",
+                    font=dict(color="#64748B", size=10)),
+        margin=dict(l=10, r=10, t=55, b=55),
+    )
+
+
+def _get_plotly_points(event):
+    """Extrai os pontos selecionados de forma tolerante entre versões do Streamlit."""
+    if event is None:
+        return []
+    try:
+        selection = event.selection
+        if hasattr(selection, "get"):
+            return selection.get("points", []) or []
+        return getattr(selection, "points", []) or []
+    except Exception:
+        return []
+
+
+def selected_value(event):
+    """Retorna o valor customdata/label do primeiro ponto selecionado."""
+    points = _get_plotly_points(event)
+    if not points:
+        return None
+    p = points[0]
+    if isinstance(p, dict):
+        return p.get("customdata") or p.get("label") or p.get("x")
+    return getattr(p, "customdata", None) or getattr(p, "label", None) or getattr(p, "x", None)
+
+
+def render_interactive_chart(fig, key, empty_msg=None):
+    """Renderiza Plotly com seleção por clique."""
+    if fig is None:
+        if empty_msg:
+            st.info(empty_msg)
+        return None
+    return st.plotly_chart(
+        fig, width="stretch", theme=None,
+        config={"displayModeBar": False, "scrollZoom": False},
+        key=key, on_select="rerun", selection_mode=["points"],
+    )
 
 
 # ============================================================
@@ -1086,6 +1176,12 @@ def tab_acompanhamento(df_p, df_unidades):
     def pct(n, t):
         return f"{n / t * 100:.0f}% do total" if t else None
 
+    # ---------- estado dos filtros interativos ----------
+    st.session_state.setdefault("acomp_status_filter", None)
+    st.session_state.setdefault("acomp_etapa_filter", None)
+    st.session_state.setdefault("acomp_chart_reset", 0)
+    st.session_state.setdefault("acomp_last_unidade", None)
+
     # ---------- 1. Big numbers gerais ----------
     total = len(df_p)
     c = contagens(df_p)
@@ -1106,6 +1202,14 @@ def tab_acompanhamento(df_p, df_unidades):
     fc, _ = st.columns([1, 3])
     with fc:
         sel = st.selectbox("Unidade", ["Todas"] + plantas, key="acomp_unidade")
+
+    # Ao trocar a unidade, limpa os filtros dos gráficos para evitar combinação inesperada.
+    if st.session_state["acomp_last_unidade"] is not None and st.session_state["acomp_last_unidade"] != sel:
+        st.session_state["acomp_status_filter"] = None
+        st.session_state["acomp_etapa_filter"] = None
+        st.session_state["acomp_chart_reset"] += 1
+    st.session_state["acomp_last_unidade"] = sel
+
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
 
     # ---------- 3. Volume + propostas da unidade ----------
@@ -1117,26 +1221,116 @@ def tab_acompanhamento(df_p, df_unidades):
     v_anal = vol_u["peso_analisado"].sum() if not vol_u.empty else None
 
     nome = "Todas as unidades" if sel == "Todas" else sel.title()
-    section(f"{nome} — volume e propostas")
-    kpi_row([
-        ("Volume total (MP)", f"{fmt_num(v_total)} ton" if v_total is not None else "—", "peso médio", COR["azul_claro"]),
-        ("Volume analisado", f"{fmt_num(v_anal)} ton" if v_anal is not None else "—", None, COR["azul"]),
-        ("% analisado", f"{fmt_num(v_anal / v_total * 100, 1)}%" if v_total else "—", None, COR["roxo"]),
-        ("Propostas", fmt_num(len(df_u)), None, get_unidade_color(sel)),
-    ])
-    status_bar(df_u, f"Status das {len(df_u)} propostas")
 
-    st.write("")
+    # Filtros atuais aplicados à lista
+    df_f = df_u.copy()
+    if st.session_state["acomp_status_filter"]:
+        df_f = df_f[df_f["_GRUPO"] == st.session_state["acomp_status_filter"]]
+    if st.session_state["acomp_etapa_filter"]:
+        df_f = df_f[df_f["_ETAPA"] == st.session_state["acomp_etapa_filter"]]
+
+    section(f"{nome} — volume e propostas")
+
+    # KPIs passam a refletir o filtro clicado, quando houver.
+    f_total = len(df_f)
+    f_ativos = df_f[~df_f["_INVIAVEL"]]
+    filtro_txt = []
+    if st.session_state["acomp_status_filter"]:
+        filtro_txt.append(st.session_state["acomp_status_filter"])
+    if st.session_state["acomp_etapa_filter"]:
+        filtro_txt.append(st.session_state["acomp_etapa_filter"])
+    filtro_sub = " · ".join(filtro_txt) if filtro_txt else None
+
+    kpi_row([
+        ("Volume total (MP)", f"{fmt_num(v_total)} ton" if v_total is not None else "—",
+         "peso médio", COR["azul_claro"]),
+        ("Volume analisado", f"{fmt_num(v_anal)} ton" if v_anal is not None else "—",
+         None, COR["azul"]),
+        ("% analisado", f"{fmt_num(v_anal / v_total * 100, 1)}%" if v_total else "—",
+         None, COR["roxo"]),
+        ("Propostas", fmt_num(f_total), filtro_sub, get_unidade_color(sel)),
+    ])
+
+    # ---------- 3A. Roscas interativas ----------
+    st.markdown(
+        '<div style="margin:4px 0 8px;color:#64748B;font-size:12px">'
+        '<b>Interação:</b> clique em uma fatia para filtrar as propostas abaixo. '
+        'Os filtros de status e etapa podem ser combinados.</div>',
+        unsafe_allow_html=True,
+    )
+
     g1, g2 = st.columns(2)
+    chart_key_suffix = st.session_state["acomp_chart_reset"]
+
     with g1:
-        render_chart(create_progress_chart(df_unidades, destaque=sel), "Dados de volume não encontrados na aba Formulas.",
-                     key="acomp_volume")
+        ev_status = render_interactive_chart(
+            create_status_donut(df_u),
+            key=f"acomp_status_donut_{chart_key_suffix}",
+            empty_msg="Nenhum status disponível.",
+        )
+        clicked_status = selected_value(ev_status)
+        if clicked_status in [g for g, _ in GRUPOS]:
+            st.session_state["acomp_status_filter"] = clicked_status
+
     with g2:
-        render_chart(create_etapa_chart(df_u), "Nenhuma proposta em andamento.", key="acomp_etapa")
+        ev_etapa = render_interactive_chart(
+            create_etapa_donut(df_u),
+            key=f"acomp_etapa_donut_{chart_key_suffix}",
+            empty_msg="Nenhuma proposta em andamento.",
+        )
+        clicked_etapa = selected_value(ev_etapa)
+        if clicked_etapa:
+            valid_etapas = {s[1] for s in STAGE_DEFS if s[2]}
+            if clicked_etapa in valid_etapas:
+                st.session_state["acomp_etapa_filter"] = clicked_etapa
+
+    # Recalcula depois do clique para que a lista abaixo já apareça filtrada nesta execução.
+    df_f = df_u.copy()
+    if st.session_state["acomp_status_filter"]:
+        df_f = df_f[df_f["_GRUPO"] == st.session_state["acomp_status_filter"]]
+    if st.session_state["acomp_etapa_filter"]:
+        df_f = df_f[df_f["_ETAPA"] == st.session_state["acomp_etapa_filter"]]
+
+    # Filtros visíveis e botão de limpeza.
+    fc1, fc2, fc3 = st.columns([2, 2, 1])
+    with fc1:
+        if st.session_state["acomp_status_filter"]:
+            st.markdown(
+                f'<div style="background:#EEF1FB;border:1px solid #CBD8FB;border-radius:8px;'
+                f'padding:7px 10px;color:#334155;font-size:12px">'
+                f'🔵 <b>Status:</b> {esc(st.session_state["acomp_status_filter"])}</div>',
+                unsafe_allow_html=True,
+            )
+    with fc2:
+        if st.session_state["acomp_etapa_filter"]:
+            st.markdown(
+                f'<div style="background:#F8FAFC;border:1px solid #E2E6F0;border-radius:8px;'
+                f'padding:7px 10px;color:#334155;font-size:12px">'
+                f'🧭 <b>Etapa:</b> {esc(st.session_state["acomp_etapa_filter"])}</div>',
+                unsafe_allow_html=True,
+            )
+    with fc3:
+        if (st.session_state["acomp_status_filter"] or st.session_state["acomp_etapa_filter"]):
+            if st.button("✕ Limpar filtros", key="acomp_clear_filters", use_container_width=True):
+                st.session_state["acomp_status_filter"] = None
+                st.session_state["acomp_etapa_filter"] = None
+                st.session_state["acomp_chart_reset"] += 1
+                st.rerun()
+
+    # ---------- 3B. Volume por unidade permanece como estava ----------
+    st.write("")
+    render_chart(
+        create_progress_chart(df_unidades, destaque=sel),
+        "Dados de volume não encontrados na aba Formulas.",
+        key="acomp_volume",
+    )
 
     # ---------- 4. Lista de propostas ----------
-    section("Propostas", "Ordenadas da menos para a mais avançada. Clique na unidade para abrir. "
-                         "Deixe o mouse sobre a bolinha destacada para ver a etapa no fluxo BSW.")
+    section(
+        f"Propostas ({len(df_f)})",
+        "Filtradas pelos gráficos acima. Ordenadas da menos para a mais avançada. "
+        "Deixe o mouse sobre a bolinha destacada para ver a etapa no fluxo BSW."
+    )
     st.markdown(
         '<div class="legend">'
         '<span><i style="background:#1400FF;border-color:#1400FF"></i>concluída / N/A</span>'
@@ -1146,13 +1340,16 @@ def tab_acompanhamento(df_p, df_unidades):
         '<span><i style="border-color:#94A3B8;border-style:dashed"></i>informativa (não conta no %)</span>'
         '</div>', unsafe_allow_html=True)
 
-    blocos = []
-    plantas_u = ordenar_plantas(df_u["_PLANTA"].unique().tolist())
-    for planta in plantas_u:
-        g = df_u[df_u["_PLANTA"] == planta].sort_values(["_INVIAVEL", "_PCT"])
-        blocos.append(timeline_block_html(planta, g, aberto=(sel != "Todas" or len(plantas_u) == 1)))
-    st.markdown("".join(blocos) + fluxo_tooltip_html(), unsafe_allow_html=True)
-    components.html(TOOLTIP_JS, height=0)
+    if df_f.empty:
+        st.info("Nenhuma proposta corresponde aos filtros selecionados.")
+    else:
+        blocos = []
+        plantas_u = ordenar_plantas(df_f["_PLANTA"].unique().tolist())
+        for planta in plantas_u:
+            g = df_f[df_f["_PLANTA"] == planta].sort_values(["_INVIAVEL", "_PCT"])
+            blocos.append(timeline_block_html(planta, g, aberto=(sel != "Todas" or len(plantas_u) == 1)))
+        st.markdown("".join(blocos) + fluxo_tooltip_html(), unsafe_allow_html=True)
+        components.html(TOOLTIP_JS, height=0)
 
 
 # ============================================================
@@ -1271,3 +1468,4 @@ if __name__ == "__main__":
     except Exception as e:
         st.error("O dashboard encontrou um erro e foi protegido para não ficar em tela branca.")
         st.exception(e)
+      
