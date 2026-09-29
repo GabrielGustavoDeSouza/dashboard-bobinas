@@ -41,7 +41,7 @@ GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 ADMIN_PASSWORD_PADRAO = "M@ster"
-APP_VERSAO = "29/09 · Pareto área pendente"
+APP_VERSAO = "29/09 · barras área pendente"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -1156,9 +1156,9 @@ def pareto_altura(serie):
     return int(min(620, max(360, serie.nunique() * 40 + 130)))
 
 
-def create_pareto(serie, titulo, selecionado=None, height=420):
-    """Pareto horizontal: barras em ordem decrescente + linha de % acumulado.
-    Barras até 80% acumulado em azul forte ('poucos vitais'); 'Não informado' sempre no fim, em cinza."""
+def create_barras_area(serie, cores, selecionado=None, height=420):
+    """Barras horizontais, da maior para a menor ('Não informado' no fim, em cinza).
+    Cada área com sua cor; rótulo com quantidade e % do total. Clique numa barra para filtrar."""
     cont = serie.value_counts()
     cats = [c for c in cont.index if c != NAO_INF]
     if NAO_INF in cont.index:
@@ -1167,10 +1167,6 @@ def create_pareto(serie, titulo, selecionado=None, height=420):
         return None
     vals = [int(cont[c]) for c in cats]
     total = sum(vals)
-    acum, soma = [], 0
-    for v in vals:
-        soma += v
-        acum.append(soma / total * 100)
     rot, vistos = [], set()
     for c in cats:
         r = _quebra(c)
@@ -1178,29 +1174,20 @@ def create_pareto(serie, titulo, selecionado=None, height=420):
             r += " "
         vistos.add(r)
         rot.append(r)
-    cores = []
-    for c, ac, v in zip(cats, acum, vals):
-        base = COR_NAO_INF if c == NAO_INF else ("#4D6BFF" if ac - v / total * 100 < 80 else "#A5B4FC")
-        cores.append(rgba(base, 1.0 if selecionado in (None, c) else 0.25))
-    fig = go.Figure()
-    fig.add_bar(y=rot, x=vals, orientation="h", customdata=cats, marker=dict(color=cores),
-                text=[f"{v}" for v in vals], textposition="outside", cliponaxis=False,
-                textfont=dict(color=COR["texto"], size=12),
-                hovertemplate="<b>%{customdata}</b><br>%{x} propostas<extra></extra>")
-    fig.add_scatter(y=rot, x=acum, xaxis="x2", mode="lines+markers", customdata=cats,
-                    line=dict(color="#F59E0B", width=2), marker=dict(size=7, color="#F59E0B"),
-                    hovertemplate="<b>%{customdata}</b><br>acumulado: %{x:.0f}%<extra></extra>")
-    fig = _layout(fig, f"{titulo}<br><sup style='color:#94A3B8'>barras = propostas · linha laranja = % acumulado · "
-                       f"clique numa barra para filtrar</sup>",
-                  height=height, showlegend=False, clickmode="event+select", bargap=0.3,
-                  yaxis=dict(autorange="reversed", automargin=True, tickfont=dict(size=11, color="#334155"), **GRID),
-                  xaxis=dict(title=None, range=[0, max(vals) * 1.15], **GRID),
-                  xaxis2=dict(overlaying="x", side="top", range=[0, 105], ticksuffix="%", showgrid=False,
-                              tickvals=[0, 20, 40, 60, 80, 100], ticktext=["0%", "20%", "40%", "60%", "80%", "100%"],
-                              tickfont=dict(color="#F59E0B", size=10)),
-                  margin=dict(l=10, r=20, t=90, b=20))
-    fig.add_vline(x=80, xref="x2", line=dict(color="#F59E0B", width=1, dash="dot"))
-    return fig
+    cor = [rgba(cores.get(c, COR["azul"]), 1.0 if selecionado in (None, c) else 0.25) for c in cats]
+    fig = go.Figure(go.Bar(
+        y=rot, x=vals, orientation="h", customdata=cats, marker=dict(color=cor, line=dict(width=0)),
+        text=[f"<b>{v}</b>  ({v / total * 100:.0f}%)" for v in vals], textposition="outside", cliponaxis=False,
+        textfont=dict(color=COR["texto"], size=12),
+        hovertemplate="<b>%{customdata}</b><br>%{x} propostas<extra></extra>",
+    ))
+    return _layout(fig, "Área pendente de atuação",
+                   height=height, showlegend=False, clickmode="event+select", bargap=0.28,
+                   yaxis=dict(autorange="reversed", automargin=True, tickfont=dict(size=11, color="#334155"),
+                              showgrid=False),
+                   xaxis=dict(range=[0, max(vals) * 1.28], showticklabels=False, showgrid=True,
+                              gridcolor="#F1F3F8", zeroline=False),
+                   margin=dict(l=10, r=20, t=70, b=20))
 
 
 def create_donut(serie, titulo, centro_txt, filtro_id, ordem, cores, selecionado=None, height=340):
@@ -1449,10 +1436,10 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
                                   ordem_viab, cores_viab, ss["f_viab"], height=altura), "Sem propostas.", key=f"pz_viab_{n}")
     with p2:
         k_area = f"pz_area_{n}"
-        fig_area = create_pareto(df_pend["_AREA_CAT"], "Área pendente de atuação (Pareto)", ss["f_area"], altura)
+        fig_area = create_barras_area(df_pend["_AREA_CAT"], cores_area, ss["f_area"], altura)
         if fig_area is not None:
-            fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes<br><sup style='color:#94A3B8'>"
-                                          "sem concluídas e inviáveis · linha laranja = % acumulado · "
+            fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes<br>"
+                                          "<sup style='color:#94A3B8'>sem concluídas e inviáveis · "
                                           "clique numa barra para filtrar</sup>")
         render_chart(fig_area, "Nenhuma proposta pendente: todas estão concluídas ou inviáveis.", key=k_area,
                      on_select=lambda: _cb_area(k_area))
