@@ -41,7 +41,7 @@ GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 ADMIN_PASSWORD_PADRAO = "M@ster"
-APP_VERSAO = "29/09 · barras área pendente"
+APP_VERSAO = "29/09 · filtro cruzado"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -1315,8 +1315,10 @@ def _cb_unidade(chart_key, plantas):
 
 def _cb_filtro(filtro, valor):
     st.session_state[filtro] = None if st.session_state.get(filtro) == valor else valor
-    if filtro == "f_viab":  # mudou a viabilidade: a área escolhida pode não existir mais
+    # viabilidade concluída/inviável não tem área pendente: aí a área escolhida deixa de valer
+    if filtro == "f_viab" and st.session_state.get("f_viab") and viab_decidida(st.session_state["f_viab"]):
         st.session_state["f_area"] = None
+    _nova_rodada()
 
 
 def _cb_area(chart_key):
@@ -1394,11 +1396,15 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
             st.markdown('<div class="chips hint">💡 Clique nos gráficos abaixo para filtrar '
                         '(unidade, viabilidade ou área). Clique de novo para desfazer.</div>', unsafe_allow_html=True)
 
+    # ---- filtro cruzado: cada gráfico filtra os outros e a lista ----
+    f_viab, f_area = ss["f_viab"], ss["f_area"]
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
-    df_v = df_u if not ss["f_viab"] else df_u[df_u["_VIAB_CAT"] == ss["f_viab"]]
-    # Área pendente: saem só as Concluídas e as Inviáveis (Viável e Viável c/ restrições continuam)
-    df_pend = df_v[~df_v["_VIAB_CAT"].apply(viab_decidida)]
-    df_a = df_v if not ss["f_area"] else df_pend[df_pend["_AREA_CAT"] == ss["f_area"]]
+    pend_u = ~df_u["_VIAB_CAT"].apply(viab_decidida)  # Área pendente: saem só Concluídas e Inviáveis
+    m_viab = (df_u["_VIAB_CAT"] == f_viab) if f_viab else pd.Series(True, index=df_u.index)
+    m_area = (pend_u & (df_u["_AREA_CAT"] == f_area)) if f_area else pd.Series(True, index=df_u.index)
+    df_donut = df_u[m_area]                 # rosca: filtrada pela área clicada
+    df_pend = df_u[m_viab & pend_u]         # barras: filtradas pela viabilidade clicada
+    df_a = df_u[m_viab & m_area]            # lista e KPIs: todos os filtros
 
     # ---------- 3. Volume da unidade ----------
     if sel == "Todas" or df_unidades.empty:
@@ -1423,7 +1429,8 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
         ("Volume total (MP)", f"{fmt_num(v_total)} ton" if v_total is not None else "—", "peso médio", COR["azul_claro"]),
         ("Volume analisado", f"{fmt_num(v_anal)} ton" if v_anal is not None else "—", None, COR["azul"]),
         ("% analisado", f"{fmt_num(v_anal / v_total * 100, 1)}%" if v_total else "—", None, COR["roxo"]),
-        ("Propostas", fmt_num(len(df_u)), None, get_unidade_color(sel)),
+        ("Propostas", fmt_num(len(df_a)), f"filtradas de {fmt_num(len(df_u))}" if len(df_a) != len(df_u) else None,
+         get_unidade_color(sel)),
         ("Valor validado BSW", val_txt, val_sub, COR["verde"]),
     ])
     st.write("")
@@ -1432,19 +1439,20 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     altura = pareto_altura(df_pend["_AREA_CAT"]) if len(df_pend) else 380  # mesma altura nos dois
     p1, p2 = st.columns([2, 3])
     with p1:
-        render_chart(create_donut(df_u["_VIAB_CAT"], "Viabilidade técnica", "PROPOSTAS", "f_viab",
+        render_chart(create_donut(df_donut["_VIAB_CAT"], "Viabilidade técnica" + (f" · {esc(f_area[:38] + ('…' if len(f_area) > 38 else ''))}" if f_area else ""), "PROPOSTAS", "f_viab",
                                   ordem_viab, cores_viab, ss["f_viab"], height=altura), "Sem propostas.", key=f"pz_viab_{n}")
     with p2:
         k_area = f"pz_area_{n}"
         fig_area = create_barras_area(df_pend["_AREA_CAT"], cores_area, ss["f_area"], altura)
         if fig_area is not None:
-            fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes<br>"
+            extra = f" · {f_viab}" if f_viab else ""
+            fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes{esc(extra)}<br>"
                                           "<sup style='color:#94A3B8'>sem concluídas e inviáveis · "
                                           "clique numa barra para filtrar</sup>")
         render_chart(fig_area, "Nenhuma proposta pendente: todas estão concluídas ou inviáveis.", key=k_area,
                      on_select=lambda: _cb_area(k_area))
     # botões ocultos na mesma ordem das fatias (índice -> valor)
-    ov = [c for c in ordem_viab if (df_u["_VIAB_CAT"] == c).any()]
+    ov = [c for c in ordem_viab if (df_donut["_VIAB_CAT"] == c).any()]
 
     # ---------- 5. Volume total x analisado ----------
     k_vol = f"acomp_vol_{n}"
@@ -1473,7 +1481,7 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
         '</div>', unsafe_allow_html=True)
     blocos = []
     plantas_u = ordenar_plantas(df_a["_PLANTA"].unique().tolist())
-    abrir = sel != "Todas" or len(plantas_u) == 1 or bool(ss["f_viab"] or ss["f_area"])
+    abrir = sel != "Todas" or len(plantas_u) == 1 or bool(f_viab or f_area)
     for planta in plantas_u:
         g = df_a[df_a["_PLANTA"] == planta].sort_values(["_INVIAVEL", "_PCT"])
         blocos.append(timeline_block_html(planta, g, aberto=abrir))
