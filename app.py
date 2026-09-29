@@ -41,6 +41,7 @@ GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 ADMIN_PASSWORD_PADRAO = "M@ster"
+APP_VERSAO = "29/09 · Pareto área pendente"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -1550,7 +1551,8 @@ def sidebar():
             '<div style="padding:10px;background:#FFFFFF;border-radius:10px;border:1px solid #E2E6F0;margin-top:16px">'
             '<p style="color:#64748B;font-size:11px;margin:0;line-height:1.6">'
             '<b>📋 Rotina:</b> Dados atualizados toda segunda-feira.<br>'
-            '<b>👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.</p></div>',
+            '<b>👥 Visitantes:</b> Visualizam automaticamente os dados mais recentes.</p></div>'
+            f'<p style="color:#94A3B8;font-size:10px;margin-top:10px;text-align:center">versão {APP_VERSAO}</p>',
             unsafe_allow_html=True)
 
 
