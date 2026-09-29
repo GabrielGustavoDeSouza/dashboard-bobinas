@@ -372,13 +372,25 @@ def light_table(df_table, numeric_cols=()):
     )
 
 
-def render_chart(fig, empty_msg=None, key=None, on_select=None):
-    """Renderiza Plotly e, quando solicitado, captura clique para filtrar."""
-    if fig is not None:
-        extra = dict(on_select=on_select, selection_mode="points") if on_select else {}
-        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False}, key=key, **extra)
-    elif empty_msg:
-        st.info(empty_msg)
+def render_chart(fig, empty_msg=None, key=None, on_select=False):
+    """Renderiza Plotly com seleção por clique.
+
+    Streamlit espera on_select="rerun" (não um callback Python). O evento
+    retornado contém os pontos clicados e é tratado pela aba de acompanhamento.
+    """
+    if fig is None:
+        if empty_msg:
+            st.info(empty_msg)
+        return None
+    return st.plotly_chart(
+        fig,
+        width="stretch",
+        theme=None,
+        key=key,
+        config={"displayModeBar": False, "scrollZoom": False},
+        on_select="rerun" if on_select else "ignore",
+        selection_mode="points" if on_select else None,
+    )
 
 
 def _layout(fig, title, height=380, **extra):
@@ -1003,62 +1015,104 @@ def create_group_bar(df, col_media, group_col, title, top_n=10, by_unit_color=Fa
     return _hbar(dist.index, dist.values, cores, title)
 
 
+def _donut_colors(base_colors, selected=None, labels=None):
+    """Mantém a paleta original e apenas reduz a opacidade do que não está selecionado."""
+    if labels is None:
+        labels = []
+    return [rgba(c, 1.0 if selected in (None, label) else 0.22)
+            for c, label in zip(base_colors, labels)]
+
+
 def create_etapa_chart(df_x, sel_etapa=None):
-    """Rosca das etapas das propostas em andamento; clique em uma etapa para filtrar."""
+    """Rosca compacta das etapas; a fatia clicada representa o filtro."""
     ordem = [s[1] for s in STAGE_DEFS if s[2]]
     cont = df_x.loc[df_x["_GRUPO"] == "Em andamento", "_ETAPA"].value_counts()
     labels = [e for e in ordem if cont.get(e, 0) > 0]
     if not labels:
         return None
-    labels = labels[::-1]
     vals = [int(cont[e]) for e in labels]
-    foco = [1.0 if sel_etapa in (None, e) else 0.30 for e in labels]
+    pal = [COR["azul"], COR["roxo"], COR["azul_claro"], COR["verde"],
+           COR["laranja"], COR["coral"], COR["vermelho"]]
+    base_colors = [pal[i % len(pal)] for i in range(len(labels))]
+    total = sum(vals)
     fig = go.Figure(go.Pie(
-        labels=labels, values=vals, customdata=labels, hole=0.58,
-        sort=False, direction="clockwise",
-        marker=dict(colors=[rgba(COR["azul"], f) for f in foco],
-                    line=dict(color="#FFFFFF", width=2)),
-        textinfo="label+value", textposition="outside",
-        textfont=dict(color=COR["texto"], size=11),
-        hovertemplate="<b>%{label}</b><br>%{value} propostas (%{percent})<extra></extra>"
+        labels=labels,
+        values=vals,
+        customdata=labels,
+        hole=0.66,
+        sort=False,
+        direction="clockwise",
+        marker=dict(
+            colors=_donut_colors(base_colors, sel_etapa, labels),
+            line=dict(color="#FFFFFF", width=3),
+        ),
+        textinfo="percent",
+        textposition="inside",
+        insidetextorientation="radial",
+        hovertemplate="<b>%{label}</b><br>%{value} propostas (%{percent})<extra></extra>",
     ))
-    fig.add_annotation(text=f"<b>{sum(vals)}</b><br><span style='font-size:11px'>em andamento</span>",
-                       x=0.5, y=0.5, showarrow=False,
-                       font=dict(size=18, color=COR["texto"]))
-    return _layout(fig, "Em andamento: etapa em que cada proposta está",
-                   height=400, showlegend=False, clickmode="event+select",
-                   margin=dict(l=25, r=25, t=65, b=20))
+    fig.add_annotation(
+        text=f"<b>{total}</b><br><span style='font-size:10px;color:#64748B'>EM ANDAMENTO</span>",
+        x=0.5, y=0.5, showarrow=False,
+        font=dict(size=18, color=COR["texto"]),
+    )
+    return _layout(
+        fig,
+        "Etapa atual",
+        height=330,
+        showlegend=True,
+        clickmode="event+select",
+        legend=dict(orientation="h", y=-0.04, x=0.5, xanchor="center",
+                    font=dict(color="#475569", size=10),
+                    itemclick=False, itemdoubleclick=False),
+        margin=dict(l=10, r=10, t=58, b=55),
+    )
 
 
 def create_status_chart(df_x, sel_status=None):
-    """Rosca dos 4 status; clique em uma fatia para filtrar as propostas."""
+    """Rosca compacta dos 4 status; clique em uma fatia filtra a lista."""
     cont = df_x["_GRUPO"].value_counts()
-    labels, vals, colors = [], [], []
+    labels, vals, base_colors = [], [], []
     for g, c in GRUPOS:
         n = int(cont.get(g, 0))
         if n:
             labels.append(g)
             vals.append(n)
-            colors.append(rgba(c, 1.0 if sel_status in (None, g) else 0.30))
+            base_colors.append(c)
     if not labels:
         return None
     total = sum(vals)
     fig = go.Figure(go.Pie(
-        labels=labels, values=vals, customdata=labels, hole=0.60,
-        sort=False, direction="clockwise",
-        marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
-        textinfo="percent", textposition="inside",
-        textfont=dict(color="#FFFFFF", size=12),
-        hovertemplate="<b>%{label}</b><br>%{value} propostas (%{percent})<extra></extra>"
+        labels=labels,
+        values=vals,
+        customdata=labels,
+        hole=0.66,
+        sort=False,
+        direction="clockwise",
+        marker=dict(
+            colors=_donut_colors(base_colors, sel_status, labels),
+            line=dict(color="#FFFFFF", width=3),
+        ),
+        textinfo="percent",
+        textposition="inside",
+        hovertemplate="<b>%{label}</b><br>%{value} propostas (%{percent})<extra></extra>",
     ))
-    fig.add_annotation(text=f"<b>{total}</b><br><span style='font-size:11px'>propostas</span>",
-                       x=0.5, y=0.5, showarrow=False,
-                       font=dict(size=18, color=COR["texto"]))
-    return _layout(fig, f"Status das {total} propostas", height=270,
-                   showlegend=True, clickmode="event+select",
-                   legend=dict(orientation="h", y=-0.05, x=0,
-                               font=dict(color="#475569", size=11)),
-                   margin=dict(l=20, r=20, t=55, b=35))
+    fig.add_annotation(
+        text=f"<b>{total}</b><br><span style='font-size:10px;color:#64748B'>PROPOSTAS</span>",
+        x=0.5, y=0.5, showarrow=False,
+        font=dict(size=18, color=COR["texto"]),
+    )
+    return _layout(
+        fig,
+        f"Status das propostas",
+        height=330,
+        showlegend=True,
+        clickmode="event+select",
+        legend=dict(orientation="h", y=-0.04, x=0.5, xanchor="center",
+                    font=dict(color="#475569", size=10),
+                    itemclick=False, itemdoubleclick=False),
+        margin=dict(l=10, r=10, t=58, b=55),
+    )
 
 
 # ============================================================
@@ -1134,20 +1188,26 @@ def status_bar(df_x, titulo):
         unsafe_allow_html=True)
 
 
-def _pontos_selecionados(chart_key):
-    state = st.session_state.get(chart_key)
-    if state is None:
+def _pontos_evento(event):
+    """Extrai os pontos selecionados de PlotlyState/ditado retornado pelo Streamlit."""
+    if event is None:
         return []
-    sel = state.get("selection", None) if isinstance(state, dict) else getattr(state, "selection", None)
-    if sel is None:
-        return []
-    pts = sel.get("points") if isinstance(sel, dict) else getattr(sel, "points", None)
-    return list(pts or [])
+    try:
+        selection = event.selection
+        points = selection.points
+        return list(points or [])
+    except Exception:
+        pass
+    if isinstance(event, dict):
+        selection = event.get("selection", {}) or {}
+        if isinstance(selection, dict):
+            return list(selection.get("points", []) or [])
+    return []
 
 
-def _valor_clicado(chart_key):
-    for pt in _pontos_selecionados(chart_key):
-        cd = pt.get("customdata") if isinstance(pt, dict) else None
+def _valor_evento(event):
+    for pt in _pontos_evento(event):
+        cd = pt.get("customdata") if isinstance(pt, dict) else getattr(pt, "customdata", None)
         if isinstance(cd, (list, tuple)):
             cd = cd[0] if cd else None
         if cd is not None and str(cd) != "":
@@ -1159,27 +1219,27 @@ def _nova_rodada_acomp():
     st.session_state["acomp_nonce"] = st.session_state.get("acomp_nonce", 0) + 1
 
 
-def _cb_status(chart_key):
-    v = _valor_clicado(chart_key)
-    if v:
-        st.session_state["f_status"] = None if st.session_state.get("f_status") == v else v
-    _nova_rodada_acomp()
-
-
-def _cb_etapa(chart_key):
-    v = _valor_clicado(chart_key)
-    if v:
-        st.session_state["f_etapa"] = None if st.session_state.get("f_etapa") == v else v
-    _nova_rodada_acomp()
-
-
-def _cb_unidade(chart_key, plantas):
-    v = _valor_clicado(chart_key)
-    if v:
-        alvo = next((p for p in plantas if unidade_match(v, p)), None)
+def _aplicar_clique(event, tipo, plantas=None):
+    valor = _valor_evento(event)
+    if not valor:
+        return False
+    if tipo == "status":
+        atual = st.session_state.get("f_status")
+        st.session_state["f_status"] = None if atual == valor else valor
+    elif tipo == "etapa":
+        atual = st.session_state.get("f_etapa")
+        st.session_state["f_etapa"] = None if atual == valor else valor
+    elif tipo == "unidade" and plantas:
+        alvo = next((p for p in plantas if unidade_match(valor, p)), None)
         if alvo:
-            st.session_state["acomp_unidade"] = "Todas" if st.session_state.get("acomp_unidade") == alvo else alvo
+            atual = st.session_state.get("acomp_unidade", "Todas")
+            st.session_state["acomp_unidade"] = "Todas" if atual == alvo else alvo
+        else:
+            return False
+    else:
+        return False
     _nova_rodada_acomp()
+    return True
 
 
 def _cb_limpar_acomp():
@@ -1187,7 +1247,6 @@ def _cb_limpar_acomp():
     st.session_state["f_status"] = None
     st.session_state["f_etapa"] = None
     _nova_rodada_acomp()
-
 
 def tab_acompanhamento(df_p, df_unidades):
     if df_p is None or df_p.empty:
@@ -1226,7 +1285,13 @@ def tab_acompanhamento(df_p, df_unidades):
 
     fc, fi = st.columns([1, 3])
     with fc:
-        sel = st.selectbox("Unidade", ["Todas"] + plantas, key="acomp_unidade")
+        # O estado do filtro fica separado do widget para permitir que um clique
+        # no gráfico altere a unidade sem conflito com o estado interno do selectbox.
+        unidade_atual = ss.get("acomp_unidade", "Todas")
+        idx_unidade = (["Todas"] + plantas).index(unidade_atual) if unidade_atual in (["Todas"] + plantas) else 0
+        sel = st.selectbox("Unidade", ["Todas"] + plantas, index=idx_unidade, key="acomp_unidade_select")
+        if sel != ss.get("acomp_unidade"):
+            ss["acomp_unidade"] = sel
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
 
     # Filtros dos cliques: status e etapa podem ser combinados.
@@ -1264,20 +1329,40 @@ def tab_acompanhamento(df_p, df_unidades):
         ("Propostas", fmt_num(len(df_e)), "filtradas" if (ss["f_status"] or ss["f_etapa"]) else None, get_unidade_color(sel)),
     ])
 
-    k_status = f"acomp_status_{n}"
-    render_chart(create_status_chart(df_u, ss["f_status"]), key=k_status,
-                 on_select=lambda: _cb_status(k_status))
-
-    g1, g2 = st.columns(2)
-    with g1:
-        k_vol = f"acomp_vol_{n}"
-        fig_v = create_progress_chart(df_unidades, destaque=sel)
-        render_chart(fig_v, "Dados de volume não encontrados na aba Formulas.", key=k_vol,
-                     on_select=lambda: _cb_unidade(k_vol, plantas))
-    with g2:
+    # As roscas ficam lado a lado e o clique realmente altera os filtros
+    # antes de a lista de propostas ser renderizada.
+    g_status, g_etapa = st.columns(2)
+    with g_status:
+        k_status = f"acomp_status_{n}"
+        ev_status = render_chart(create_status_chart(df_u, ss["f_status"]), key=k_status, on_select=True)
+    with g_etapa:
         k_et = f"acomp_etapa_{n}"
-        render_chart(create_etapa_chart(df_s, ss["f_etapa"]), "Nenhuma proposta em andamento para este filtro.",
-                     key=k_et, on_select=lambda: _cb_etapa(k_et))
+        ev_etapa = render_chart(
+            create_etapa_chart(df_s, ss["f_etapa"]),
+            "Nenhuma proposta em andamento para este filtro.",
+            key=k_et,
+            on_select=True,
+        )
+
+    # Mantém o gráfico de volume abaixo das roscas.
+    k_vol = f"acomp_vol_{n}"
+    ev_vol = render_chart(
+        create_progress_chart(df_unidades, destaque=sel),
+        "Dados de volume não encontrados na aba Formulas.",
+        key=k_vol,
+        on_select=True,
+    )
+
+    # Processa o primeiro clique recebido e reinicia a tela com o filtro aplicado.
+    clicou = False
+    if _aplicar_clique(ev_status, "status"):
+        clicou = True
+    elif _aplicar_clique(ev_etapa, "etapa"):
+        clicou = True
+    elif _aplicar_clique(ev_vol, "unidade", plantas):
+        clicou = True
+    if clicou:
+        st.rerun()
 
     # ---------- Lista de propostas ----------
     section(f"Propostas ({len(df_e)})", "Clique nas roscas acima para filtrar. Clique na unidade para abrir.")
