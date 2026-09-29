@@ -61,6 +61,20 @@ PLOTLY_LAYOUT = dict(
 )
 GRID = dict(gridcolor="#EEF1F6", zerolinecolor="#EEF1F6")
 
+def rgba(hex_color, alpha=1.0):
+    """Converte uma cor HEX (#RRGGBB) para rgba() do Plotly."""
+    h = str(hex_color).strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(ch * 2 for ch in h)
+    if len(h) != 6:
+        return str(hex_color)
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        a = max(0.0, min(1.0, float(alpha)))
+        return f"rgba({r},{g},{b},{a})"
+    except (TypeError, ValueError):
+        return str(hex_color)
+
 # Etapas da aba "A.Propostas": (coluna_excel, label, conta_no_pct)
 STAGE_DEFS = [
     ("FORMALIZADO COM COMPRAS", "Formaliz. c/ Compras", True),
