@@ -707,7 +707,7 @@ def classify_formalizacao(valor, data_envio_usina):
 
 
 NAO_INF = "Não informado"
-_RE_DECIDIDA = re.compile(r"(^|[^A-Z])(IN)?VIAVEL")  # Viável, Viável com restrições, Inviável
+_RE_DECIDIDA = re.compile(r"CONCLU|INVIAVEL")  # Concluído(a) e Inviável saem da pizza de área pendente
 
 
 def viab_decidida(valor):
@@ -1122,6 +1122,8 @@ def cor_viab(v):
     u = _norm(v)
     if "INVIAV" in u:
         return "#E53E3E"
+    if "CONCLU" in u:
+        return "#0F766E"
     if "VIAV" in u:
         return "#16A34A"
     if any(k in u for k in ("ANALISE", "AVALIA", "PENDENTE", "AGUARD")):
@@ -1337,7 +1339,7 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
 
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
     df_v = df_u if not ss["f_viab"] else df_u[df_u["_VIAB_CAT"] == ss["f_viab"]]
-    # Área pendente: só propostas ainda sem viabilidade definida (Viável / Viável c/ restrições / Inviável saem)
+    # Área pendente: saem só as Concluídas e as Inviáveis (Viável e Viável c/ restrições continuam)
     df_pend = df_v[~df_v["_VIAB_CAT"].apply(viab_decidida)]
     df_a = df_v if not ss["f_area"] else df_pend[df_pend["_AREA_CAT"] == ss["f_area"]]
 
@@ -1379,9 +1381,8 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
                                 ordem_area, cores_area, ss["f_area"])
         if fig_area is not None:
             fig_area.layout.title.text = ("Área pendente de atuação<br><sup style='color:#94A3B8'>só propostas "
-                                          "sem viabilidade definida · clique para filtrar</sup>")
-        render_chart(fig_area, "Nenhuma proposta pendente: todas já têm viabilidade definida "
-                               "(Viável, Viável com restrições ou Inviável).", key=f"pz_area_{n}")
+                                          "não concluídas e não inviáveis · clique para filtrar</sup>")
+        render_chart(fig_area, "Nenhuma proposta pendente: todas estão concluídas ou inviáveis.", key=f"pz_area_{n}")
     # botões ocultos na mesma ordem das fatias (índice -> valor)
     ov = [c for c in ordem_viab if (df_u["_VIAB_CAT"] == c).any()]
     oa = [c for c in ordem_area if (df_pend["_AREA_CAT"] == c).any()]
