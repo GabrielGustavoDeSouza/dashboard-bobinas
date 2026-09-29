@@ -235,6 +235,10 @@ st.markdown("""
     .tl-dot.pending { background:#F8FAFD; border-color:#FFB800; }
     .tl-dot.empty   { background:#F8FAFD; border-color:#D1D7E3; }
     .tl-dot.tl-dot-info { border-style:dashed !important; opacity:.7; }
+    .tl-row-inviavel { background:#FFF5F5 !important; border-left:3px solid #FC8181; }
+    .tl-row-inviavel:hover { background:#FED7D7 !important; }
+    .tl-dot.tl-dot-inviavel { background:#FC8181 !important; border-color:#E53E3E !important; opacity:0.75; }
+    .tl-connector.tl-conn-inviavel { background:linear-gradient(90deg,#FC8181,#FEB2B2) !important; opacity:0.6; }
 
     /* Labels e valores abaixo da trilha */
     .tl-labels { display:flex; padding-top:6px; }
@@ -816,6 +820,8 @@ def process_propostas(df_raw, dept_map=None):
     col_envio_usina = next((c for c in df.columns if c.strip().upper() == 'DATA ENVIO P/ USINA'), None)
     # Projeto: prioridade para "Qual projeto esse item faz parte?", fallback "Nome do Projeto"
     col_projeto_a = next((c for c in df.columns if 'QUAL PROJETO' in c.upper()), None)
+    col_viabilidade = next((c for c in df.columns if 'VIABILIDADE' in c.upper()), None)
+    col_area_pendente = next((c for c in df.columns if 'PENDENTE' in c.upper()), None)
     col_projeto_b = next((c for c in df.columns if 'NOME DO PROJETO' in c.upper()), None)
 
     def _extrair_projeto(row):
@@ -835,6 +841,8 @@ def process_propostas(df_raw, dept_map=None):
     df['_REDUCAO'] = df[col_reducao].apply(parse_numero_brasileiro) if col_reducao else 0.0
     df['_CONSUMO'] = df[col_consumo].apply(parse_numero_brasileiro) if col_consumo else 0.0
     df['_PROJETO'] = df.apply(_extrair_projeto, axis=1)
+    df['_VIABILIDADE'] = df[col_viabilidade].apply(lambda x: normalizar_texto_simples(x, default='')) if col_viabilidade else ''
+    df['_AREA_PENDENTE'] = df[col_area_pendente].apply(lambda x: normalizar_texto_simples(x, default='')) if col_area_pendente else ''
 
     stage_status_list = []
     pct_list = []
@@ -863,6 +871,15 @@ def process_propostas(df_raw, dept_map=None):
         n_for_pct = n_stages_pct if n_stages_pct else 1
         passado = row['_PASSADO']
 
+        viabilidade = row.get('_VIABILIDADE', '')
+        if 'INVIÁV' in viabilidade or 'INVIAV' in viabilidade:
+            pct = 0
+            badge = ('Inviável', '#E53E3E')
+            stage_status_list.append(stages)
+            pct_list.append(pct)
+            badge_list.append(badge)
+            completed_list.append(0)
+            continue
         if 'NÃO' in passado or passado == 'NAO':
             pct = 0
             badge = ('Não enviado à usina', COLORS['coral'])
@@ -888,6 +905,7 @@ def process_propostas(df_raw, dept_map=None):
     df['_PCT'] = pct_list
     df['_BADGE'] = badge_list
     df['_COMPLETED'] = completed_list
+    df['_INVIAVEL'] = df['_VIABILIDADE'].apply(lambda v: 'INVIÁV' in str(v) or 'INVIAV' in str(v))
     df['_N_STAGES'] = len(available_stages)
 
     return df
@@ -904,6 +922,7 @@ def _dept_pill_class(dept):
 
 def render_timeline_row_html(row):
     pct = row['_PCT']
+    inviavel = bool(row.get('_INVIAVEL', False))
     codigo = html_lib.escape(str(row['CÓDIGO DELGA']))
     desc = html_lib.escape(str(row['_DESCRICAO'])[:60])
     badge_label, badge_color = row['_BADGE']
@@ -948,11 +967,14 @@ def render_timeline_row_html(row):
         status = st['status']
         counts = st.get('counts', True)
         is_last = (i == last_filled and flow_stage > 0)
-        dot_cls = f'tl-dot {status}' + (' tl-dot-info' if not counts else '') + (' tl-has-tooltip' if is_last else '')
-        tooltip_attr = f' data-fstage="{flow_stage}"' if is_last else ''
+        if inviavel:
+            dot_cls = 'tl-dot tl-dot-inviavel'
+        else:
+            dot_cls = f'tl-dot {status}' + (' tl-dot-info' if not counts else '') + (' tl-has-tooltip' if is_last else '')
+        tooltip_attr = f' data-fstage="{flow_stage}"' if is_last and not inviavel else ''
         # conector à esquerda da bolinha (exceto no primeiro)
         if i > 0:
-            conn_cls = 'tl-connector filled' if i < filled_up_to else 'tl-connector'
+            conn_cls = 'tl-connector tl-conn-inviavel' if inviavel else ('tl-connector filled' if i < filled_up_to else 'tl-connector')
             spine_html += f'<div class="{conn_cls}"></div>'
         spine_html += f'<div class="{dot_cls}"{tooltip_attr}></div>'
 
@@ -973,8 +995,14 @@ def render_timeline_row_html(row):
 
     # IMPORTANTE: sem indentação/quebras de linha "soltas" — texto
     # indentado com 4+ espaços vira bloco de código no Markdown do Streamlit.
+    inviavel_cls = ' tl-row-inviavel' if inviavel else ''
+    _pct_html = ('<div class="tl-pct-num" style="color:#E53E3E">0%</div>'
+                 '<div class="tl-pct-label" style="color:#E53E3E">inviável</div>')\
+                if inviavel else \
+                (f'<div class="tl-pct-num">{pct}%</div>'
+                 '<div class="tl-pct-label">concluído</div>')
     row_html = (
-        '<div class="tl-row">'
+        f'<div class="tl-row{inviavel_cls}">'
         '<div class="tl-info">'
         f'{projeto_html}'
         f'<div class="tl-code">{codigo}</div>'
@@ -987,10 +1015,7 @@ def render_timeline_row_html(row):
         f'<div class="tl-spine">{spine_html}</div>'
         f'<div class="tl-labels">{labels_html}</div>'
         '</div>'
-        '<div class="tl-pct">'
-        f'<div class="tl-pct-num">{pct}%</div>'
-        '<div class="tl-pct-label">concluído</div>'
-        '</div>'
+        f'<div class="tl-pct">{_pct_html}</div>'
         '</div>'
     )
     return row_html
@@ -1658,7 +1683,8 @@ def main():
             ).sum())
             enviadas = int(df_f['_PASSADO'].str.contains('SIM', na=False).sum())
             concluidas = int((df_f['_PCT'] == 100).sum())
-            pct_medio = float(df_f['_PCT'].mean()) if total_prop else 0
+            _df_v = df_f[~df_f['_INVIAVEL']] if '_INVIAVEL' in df_f.columns else df_f
+            pct_medio = float(_df_v['_PCT'].mean()) if len(_df_v) else 0
 
             pc1, pc2, pc3, pc4, pc5 = st.columns(5)
             with pc1:
@@ -1673,6 +1699,25 @@ def main():
                 st.metric("Progresso Médio", f"{pct_medio:.0f}%")
 
             st.markdown("  ", unsafe_allow_html=True)
+
+            if '_VIABILIDADE' in df_f.columns and df_f['_VIABILIDADE'].ne('').any():
+                via_counts = df_f.loc[df_f['_VIABILIDADE'] != '', '_VIABILIDADE'].value_counts()
+                if len(via_counts):
+                    st.markdown('#### Viabilidade Técnica')
+                    v_cols = st.columns(min(len(via_counts), 4))
+                    for _iv, (_vv, _vc) in enumerate(via_counts.items()):
+                        _icon = '🔴' if any(k in str(_vv).upper() for k in ['INVIÁV','INVIAV']) else '🟢'
+                        with v_cols[_iv % len(v_cols)]:
+                            st.metric(f'{_icon} {_vv}', int(_vc))
+
+            if '_AREA_PENDENTE' in df_f.columns and df_f['_AREA_PENDENTE'].ne('').any():
+                area_counts = df_f.loc[df_f['_AREA_PENDENTE'] != '', '_AREA_PENDENTE'].value_counts()
+                if len(area_counts):
+                    st.markdown('#### Área Pendente de Atuação')
+                    a_cols = st.columns(min(len(area_counts), 4))
+                    for _ia, (_av, _ac) in enumerate(area_counts.items()):
+                        with a_cols[_ia % len(a_cols)]:
+                            st.metric(_av, int(_ac))
 
             if total_prop == 0:
                 st.info("Nenhuma proposta encontrada para os filtros selecionados.")
