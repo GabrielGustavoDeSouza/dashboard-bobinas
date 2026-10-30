@@ -41,7 +41,7 @@ GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 ADMIN_PASSWORD_PADRAO = "M@ster"
-APP_VERSAO = "29/09 · filtro cruzado"
+APP_VERSAO = "30/10 · filtros da lista"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -1328,10 +1328,41 @@ def _cb_area(chart_key):
     _nova_rodada()
 
 
+FAIXAS_PCT = [("0%", 0, 0), ("1% a 25%", 1, 25), ("26% a 50%", 26, 50),
+              ("51% a 75%", 51, 75), ("76% a 99%", 76, 99), ("100%", 100, 100)]
+
+
+def faixa_pct(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return FAIXAS_PCT[0][0]
+    for nome, a, b in FAIXAS_PCT:
+        if a <= v <= b:
+            return nome
+    return FAIXAS_PCT[-1][0] if v > 100 else FAIXAS_PCT[0][0]
+
+
+def _cb_sel_viab():
+    # filtro da lista mexe no mesmo estado do gráfico de rosca
+    v = st.session_state.get("f_viab")
+    if v and viab_decidida(v):
+        st.session_state["f_area"] = None
+    _nova_rodada()
+
+
+def _cb_sel_area():
+    v = st.session_state.get("f_area")
+    if v and st.session_state.get("f_viab") and viab_decidida(st.session_state["f_viab"]):
+        st.session_state["f_viab"] = None
+    _nova_rodada()
+
+
 def _cb_limpar():
     st.session_state["acomp_unidade"] = "Todas"
     st.session_state["f_viab"] = None
     st.session_state["f_area"] = None
+    st.session_state["f_pct"] = None
     _nova_rodada()
 
 
@@ -1355,6 +1386,7 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     ss = st.session_state
     ss.setdefault("f_viab", None)
     ss.setdefault("f_area", None)
+    ss.setdefault("f_pct", None)
     ss.setdefault("acomp_nonce", 0)
 
     # cores fixas por categoria (iguais em todos os filtros)
@@ -1384,7 +1416,8 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     with fc:
         sel = st.selectbox("Unidade", ["Todas"] + plantas, key="acomp_unidade")
     ativos_f = [(k, v) for k, v in (("Unidade", sel if sel != "Todas" else None),
-                                    ("Viabilidade", ss["f_viab"]), ("Área pendente", ss["f_area"])) if v]
+                                    ("Viabilidade", ss["f_viab"]), ("Área pendente", ss["f_area"]),
+                                    ("Percentual", ss["f_pct"])) if v]
     with fi:
         st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
         if ativos_f:
@@ -1463,7 +1496,32 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     render_chart(fig_v, "Dados de volume não encontrados na aba Formulas.", key=k_vol,
                  on_select=lambda: _cb_unidade(k_vol, plantas))
 
-    # ---------- 6. Lista de propostas ----------
+    # ---------- 6. Filtros da lista (Viabilidade · Percentual · Área pendente) ----------
+    section("Filtrar propostas", "Viabilidade e Área pendente são os mesmos filtros dos gráficos acima "
+                                 "(mudar aqui também muda lá). Percentual filtra só a lista abaixo.")
+    if ss["f_viab"] not in [None] + ordem_viab:
+        ss["f_viab"] = None
+    if ss["f_area"] not in [None] + ordem_area:
+        ss["f_area"] = None
+    nomes_pct = [f[0] for f in FAIXAS_PCT]
+    if ss["f_pct"] not in [None] + nomes_pct:
+        ss["f_pct"] = None
+    df_faixa = df_a["_PCT"].apply(faixa_pct)
+    todas = lambda x: "Todas" if x is None else x
+    l1, l2, l3 = st.columns(3)
+    with l1:
+        st.selectbox("Viabilidade técnica", [None] + ordem_viab, key="f_viab", format_func=todas, placeholder="Todas",
+                     on_change=_cb_sel_viab)
+    with l2:
+        st.selectbox("Percentual de avanço", [None] + nomes_pct, key="f_pct", placeholder="Todos",
+                     format_func=lambda x: "Todos" if x is None else x)
+    with l3:
+        st.selectbox("Área pendente de atuação", [None] + ordem_area, key="f_area", format_func=todas, placeholder="Todas",
+                     on_change=_cb_sel_area)
+    if ss["f_pct"]:
+        df_a = df_a[df_faixa == ss["f_pct"]]
+
+    # ---------- 7. Lista de propostas ----------
     section(f"Propostas ({len(df_a)})",
             "Ordenadas da menos para a mais avançada. Clique na unidade para abrir. "
             "Deixe o mouse sobre a bolinha destacada para ver a etapa no fluxo BSW.")
@@ -1481,7 +1539,7 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
         '</div>', unsafe_allow_html=True)
     blocos = []
     plantas_u = ordenar_plantas(df_a["_PLANTA"].unique().tolist())
-    abrir = sel != "Todas" or len(plantas_u) == 1 or bool(f_viab or f_area)
+    abrir = sel != "Todas" or len(plantas_u) == 1 or bool(f_viab or f_area or ss["f_pct"])
     for planta in plantas_u:
         g = df_a[df_a["_PLANTA"] == planta].sort_values(["_INVIAVEL", "_PCT"])
         blocos.append(timeline_block_html(planta, g, aberto=abrir))
