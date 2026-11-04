@@ -41,7 +41,7 @@ GITHUB_DATA_PATH = "data/dados_atuais.xlsx"
 GITHUB_VALORES_PATH = "data/valores_bsw.json"  # valor validado de BSW por unidade
 GITHUB_BRANCH = "main"
 ADMIN_PASSWORD_PADRAO = "M@ster"
-APP_VERSAO = "30/10 · filtros da lista"
+APP_VERSAO = "04/11 · filtros com caixinhas"
 LOCAL_DATA_PATH = Path(__file__).parent / "data" / "dados_atuais.xlsx"
 LOCAL_VALORES_PATH = Path(__file__).parent / "data" / "valores_bsw.json"
 
@@ -260,6 +260,21 @@ details.blk[open] > summary { border-bottom:1px solid #E2E6F0; }
 .tl-pill.all, .tl-pill.none { background:#F8FAFC; color:#94A3B8; border-color:#E2E6F0; }
 .tl-pct { width:62px; flex-shrink:0; text-align:right; font-size:18px; font-weight:800; color:#1F2937; }
 .tl-pct.inv { color:#E53E3E; font-size:12px; }
+/* filtros com caixinhas (popover) — tema claro */
+[data-testid="stPopoverButton"] { background:#FFFFFF !important; color:#31333F !important;
+  border:1px solid #D5DAE5 !important; border-radius:8px !important; min-height:40px; justify-content:space-between !important; }
+[data-testid="stPopoverButton"] > div { width:100%; justify-content:space-between; }
+[data-testid="stPopoverButton"] p { color:#31333F !important; font-size:15px; }
+[data-testid="stPopoverButton"]:hover, [data-testid="stPopoverButton"][aria-expanded="true"] {
+  border-color:#1400FF !important; background:#F7F8FF !important; }
+[data-testid="stPopoverBody"] { background:#FFFFFF !important; color:#31333F !important;
+  border:1px solid #E2E6F0 !important; box-shadow:0 10px 30px rgba(15,23,42,.12) !important; max-height:420px; overflow-y:auto; }
+[data-testid="stPopoverBody"] p, [data-testid="stPopoverBody"] label { color:#31333F !important; }
+[data-testid="stPopoverBody"] button { background:#F4F6FB !important; color:#31333F !important; border:1px solid #E2E6F0 !important; }
+[data-testid="stPopoverBody"] button:hover { border-color:#1400FF !important; color:#1400FF !important; }
+[data-testid="stPopoverBody"] button p { font-size:12.5px; }
+[data-testid="stPopoverBody"] [data-testid="stCheckbox"] { padding:2px 0; }
+.flt-lbl { font-size:14px; color:#31333F; margin:0 0 6px 1px; font-weight:500; }
 .legend { font-size:11.5px; color:#64748B; margin:0 0 10px 2px; }
 .legend span { margin-right:14px; white-space:nowrap; }
 .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; border:2px solid; vertical-align:-1px; margin-right:4px; }
@@ -1156,6 +1171,11 @@ def pareto_altura(serie):
     return int(min(620, max(360, serie.nunique() * 40 + 130)))
 
 
+def _ativo(selecionado, c):
+    """selecionado: None (tudo) ou lista de categorias marcadas."""
+    return selecionado is None or c in selecionado
+
+
 def create_barras_area(serie, cores, selecionado=None, height=420):
     """Barras horizontais, da maior para a menor ('Não informado' no fim, em cinza).
     Cada área com sua cor; rótulo com quantidade e % do total. Clique numa barra para filtrar."""
@@ -1174,7 +1194,7 @@ def create_barras_area(serie, cores, selecionado=None, height=420):
             r += " "
         vistos.add(r)
         rot.append(r)
-    cor = [rgba(cores.get(c, COR["azul"]), 1.0 if selecionado in (None, c) else 0.25) for c in cats]
+    cor = [rgba(cores.get(c, COR["azul"]), 1.0 if _ativo(selecionado, c) else 0.25) for c in cats]
     fig = go.Figure(go.Bar(
         y=rot, x=vals, orientation="h", customdata=cats, marker=dict(color=cor, line=dict(width=0)),
         text=[f"<b>{v}</b>  ({v / total * 100:.0f}%)" for v in vals], textposition="outside", cliponaxis=False,
@@ -1199,11 +1219,11 @@ def create_donut(serie, titulo, centro_txt, filtro_id, ordem, cores, selecionado
     total = int(sum(cont[c] for c in ordem))
     vals = [int(cont[c]) for c in ordem]
     labels = [f"{c}  ({v})" for c, v in zip(ordem, vals)]
-    foco = [1.0 if selecionado in (None, c) else 0.25 for c in ordem]
+    foco = [1.0 if _ativo(selecionado, c) else 0.25 for c in ordem]
     fig = go.Figure(go.Pie(
         labels=labels, values=vals, customdata=ordem, hole=0.64, sort=False, direction="clockwise", rotation=90,
         marker=dict(colors=[rgba(cores[c], f) for c, f in zip(ordem, foco)], line=dict(color="#FFFFFF", width=3)),
-        pull=[0.06 if c == selecionado else 0 for c in ordem],
+        pull=[0.06 if selecionado and c in selecionado else 0 for c in ordem],
         text=[f"{v / total * 100:.0f}%" if v / total >= 0.05 else "" for v in vals], textinfo="text",
         textposition="inside", insidetextorientation="horizontal", textfont=dict(color="#FFFFFF", size=13),
         hovertemplate="<b>%{customdata}</b><br>%{value} propostas · %{percent}<extra></extra>",
@@ -1313,18 +1333,42 @@ def _cb_unidade(chart_key, plantas):
     _nova_rodada()
 
 
+# Filtros com caixinhas: cada categoria tem um checkbox (chave "ck|filtro|categoria").
+# st.session_state[filtro] = None (tudo marcado) ou lista das marcadas — recalculado a cada execução.
+def _ck(filtro, c):
+    return f"ck|{filtro}|{c}"
+
+
+def _set_filtro(filtro, valores):
+    """Marca só `valores` (None = marca todas)."""
+    for c in st.session_state.get(f"_cats_{filtro}", []):
+        st.session_state[_ck(filtro, c)] = valores is None or c in valores
+    st.session_state[filtro] = None if valores is None else list(valores)
+
+
+def _so(filtro, v):
+    """Clique no gráfico: deixa só essa categoria; clicar de novo volta a mostrar tudo."""
+    _set_filtro(filtro, None if st.session_state.get(filtro) == [v] else [v])
+
+
 def _cb_filtro(filtro, valor):
-    st.session_state[filtro] = None if st.session_state.get(filtro) == valor else valor
-    # viabilidade concluída/inviável não tem área pendente: aí a área escolhida deixa de valer
-    if filtro == "f_viab" and st.session_state.get("f_viab") and viab_decidida(st.session_state["f_viab"]):
-        st.session_state["f_area"] = None
+    _so(filtro, valor)
+    # viabilidade concluída/inviável não tem área pendente: aí o filtro de área deixa de valer
+    sel_v = st.session_state.get("f_viab")
+    if filtro == "f_viab" and sel_v and all(viab_decidida(x) for x in sel_v):
+        _set_filtro("f_area", None)
     _nova_rodada()
 
 
 def _cb_area(chart_key):
     v = _valor_clicado(chart_key)
     if v:
-        st.session_state["f_area"] = None if st.session_state.get("f_area") == v else v
+        _so("f_area", v)
+    _nova_rodada()
+
+
+def _cb_marcar(filtro, todas):
+    _set_filtro(filtro, None if todas else [])
     _nova_rodada()
 
 
@@ -1343,26 +1387,50 @@ def faixa_pct(v):
     return FAIXAS_PCT[-1][0] if v > 100 else FAIXAS_PCT[0][0]
 
 
-def _cb_sel_viab():
-    # filtro da lista mexe no mesmo estado do gráfico de rosca
-    v = st.session_state.get("f_viab")
-    if v and viab_decidida(v):
-        st.session_state["f_area"] = None
-    _nova_rodada()
+def _preparar_filtro(filtro, cats):
+    """Garante um checkbox por categoria (marcado por padrão) e calcula a seleção atual."""
+    ss = st.session_state
+    ss[f"_cats_{filtro}"] = list(cats)
+    for c in cats:
+        ss.setdefault(_ck(filtro, c), True)
+    marcadas = [c for c in cats if ss[_ck(filtro, c)]]
+    ss[filtro] = None if len(marcadas) == len(cats) else marcadas
+    return ss[filtro]
 
 
-def _cb_sel_area():
-    v = st.session_state.get("f_area")
-    if v and st.session_state.get("f_viab") and viab_decidida(st.session_state["f_viab"]):
-        st.session_state["f_viab"] = None
-    _nova_rodada()
+def resumo_filtro(sel, cats, todas="Todas", curto=40):
+    if sel is None:
+        return todas
+    if not sel:
+        return "Nenhuma"
+    cort = lambda x: x if len(x) <= curto else x[:curto - 1] + "…"
+    if len(sel) == 1:
+        return cort(sel[0])
+    fora = [c for c in cats if c not in sel]
+    if len(fora) == 1:
+        return f"Todas menos {cort(fora[0])}"
+    return f"{len(sel)} de {len(cats)} selecionadas"
+
+
+def filtro_caixinhas(titulo, filtro, cats, todas="Todas"):
+    """Botão que abre uma lista de caixinhas (seleção múltipla)."""
+    ss = st.session_state
+    st.markdown(f'<div class="flt-lbl">{esc(titulo)}</div>', unsafe_allow_html=True)
+    rot = resumo_filtro(ss.get(filtro), cats, todas)
+    with st.popover(rot, use_container_width=True):
+        b1, b2 = st.columns(2)
+        b1.button("✓ Marcar todas", key=f"all_{filtro}", on_click=_cb_marcar, args=(filtro, True),
+                  use_container_width=True)
+        b2.button("✕ Desmarcar", key=f"none_{filtro}", on_click=_cb_marcar, args=(filtro, False),
+                  use_container_width=True)
+        for c in cats:
+            st.checkbox(c, key=_ck(filtro, c), on_change=_nova_rodada)
 
 
 def _cb_limpar():
     st.session_state["acomp_unidade"] = "Todas"
-    st.session_state["f_viab"] = None
-    st.session_state["f_area"] = None
-    st.session_state["f_pct"] = None
+    for f in ("f_viab", "f_area", "f_pct"):
+        _set_filtro(f, None)
     _nova_rodada()
 
 
@@ -1384,9 +1452,6 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     components.html(TOOLTIP_JS, height=0)  # tooltip do fluxo + clique nas pizzas
 
     ss = st.session_state
-    ss.setdefault("f_viab", None)
-    ss.setdefault("f_area", None)
-    ss.setdefault("f_pct", None)
     ss.setdefault("acomp_nonce", 0)
 
     # cores fixas por categoria (iguais em todos os filtros)
@@ -1398,6 +1463,10 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     cores_area[NAO_INF] = COR_NAO_INF
     if cores_viab.get(NAO_INF):
         cores_viab[NAO_INF] = COR_NAO_INF
+    nomes_pct = [f[0] for f in FAIXAS_PCT]
+    _preparar_filtro("f_viab", ordem_viab)
+    _preparar_filtro("f_area", ordem_area)
+    _preparar_filtro("f_pct", nomes_pct)
 
     # ---------- 1. Big numbers gerais (sem filtro) ----------
     total = len(df_p)
@@ -1416,8 +1485,9 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     with fc:
         sel = st.selectbox("Unidade", ["Todas"] + plantas, key="acomp_unidade")
     ativos_f = [(k, v) for k, v in (("Unidade", sel if sel != "Todas" else None),
-                                    ("Viabilidade", ss["f_viab"]), ("Área pendente", ss["f_area"]),
-                                    ("Percentual", ss["f_pct"])) if v]
+                                    ("Viabilidade", ss["f_viab"] is not None and resumo_filtro(ss["f_viab"], ordem_viab)),
+                                    ("Área pendente", ss["f_area"] is not None and resumo_filtro(ss["f_area"], ordem_area)),
+                                    ("Percentual", ss["f_pct"] is not None and resumo_filtro(ss["f_pct"], nomes_pct))) if v]
     with fi:
         st.markdown('<div style="height:30px"></div>', unsafe_allow_html=True)
         if ativos_f:
@@ -1433,8 +1503,9 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     f_viab, f_area = ss["f_viab"], ss["f_area"]
     df_u = df_p if sel == "Todas" else df_p[df_p["_PLANTA"] == sel]
     pend_u = ~df_u["_VIAB_CAT"].apply(viab_decidida)  # Área pendente: saem só Concluídas e Inviáveis
-    m_viab = (df_u["_VIAB_CAT"] == f_viab) if f_viab else pd.Series(True, index=df_u.index)
-    m_area = (pend_u & (df_u["_AREA_CAT"] == f_area)) if f_area else pd.Series(True, index=df_u.index)
+    tudo = pd.Series(True, index=df_u.index)
+    m_viab = df_u["_VIAB_CAT"].isin(f_viab) if f_viab is not None else tudo
+    m_area = (pend_u & df_u["_AREA_CAT"].isin(f_area)) if f_area is not None else tudo
     df_donut = df_u[m_area]                 # rosca: filtrada pela área clicada
     df_pend = df_u[m_viab & pend_u]         # barras: filtradas pela viabilidade clicada
     df_a = df_u[m_viab & m_area]            # lista e KPIs: todos os filtros
@@ -1472,13 +1543,13 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
     altura = pareto_altura(df_pend["_AREA_CAT"]) if len(df_pend) else 380  # mesma altura nos dois
     p1, p2 = st.columns([2, 3])
     with p1:
-        render_chart(create_donut(df_donut["_VIAB_CAT"], "Viabilidade técnica" + (f" · {esc(f_area[:38] + ('…' if len(f_area) > 38 else ''))}" if f_area else ""), "PROPOSTAS", "f_viab",
+        render_chart(create_donut(df_donut["_VIAB_CAT"], "Viabilidade técnica" + (f" · {esc(resumo_filtro(f_area, ordem_area, curto=34))}" if f_area is not None else ""), "PROPOSTAS", "f_viab",
                                   ordem_viab, cores_viab, ss["f_viab"], height=altura), "Sem propostas.", key=f"pz_viab_{n}")
     with p2:
         k_area = f"pz_area_{n}"
         fig_area = create_barras_area(df_pend["_AREA_CAT"], cores_area, ss["f_area"], altura)
         if fig_area is not None:
-            extra = f" · {f_viab}" if f_viab else ""
+            extra = f" · {resumo_filtro(f_viab, ordem_viab, curto=30)}" if f_viab is not None else ""
             fig_area.layout.title.text = (f"Área pendente de atuação — {len(df_pend)} pendentes{esc(extra)}<br>"
                                           "<sup style='color:#94A3B8'>sem concluídas e inviáveis · "
                                           "clique numa barra para filtrar</sup>")
@@ -1497,29 +1568,18 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
                  on_select=lambda: _cb_unidade(k_vol, plantas))
 
     # ---------- 6. Filtros da lista (Viabilidade · Percentual · Área pendente) ----------
-    section("Filtrar propostas", "Viabilidade e Área pendente são os mesmos filtros dos gráficos acima "
-                                 "(mudar aqui também muda lá). Percentual filtra só a lista abaixo.")
-    if ss["f_viab"] not in [None] + ordem_viab:
-        ss["f_viab"] = None
-    if ss["f_area"] not in [None] + ordem_area:
-        ss["f_area"] = None
-    nomes_pct = [f[0] for f in FAIXAS_PCT]
-    if ss["f_pct"] not in [None] + nomes_pct:
-        ss["f_pct"] = None
+    section("Filtrar propostas", "Marque uma ou mais opções em cada filtro. Viabilidade e Área pendente são os mesmos "
+                                 "filtros dos gráficos acima (mudar aqui também muda lá). Percentual filtra só a lista abaixo.")
     df_faixa = df_a["_PCT"].apply(faixa_pct)
-    todas = lambda x: "Todas" if x is None else x
     l1, l2, l3 = st.columns(3)
     with l1:
-        st.selectbox("Viabilidade técnica", [None] + ordem_viab, key="f_viab", format_func=todas, placeholder="Todas",
-                     on_change=_cb_sel_viab)
+        filtro_caixinhas("Viabilidade técnica", "f_viab", ordem_viab)
     with l2:
-        st.selectbox("Percentual de avanço", [None] + nomes_pct, key="f_pct", placeholder="Todos",
-                     format_func=lambda x: "Todos" if x is None else x)
+        filtro_caixinhas("Percentual de avanço", "f_pct", nomes_pct, todas="Todos")
     with l3:
-        st.selectbox("Área pendente de atuação", [None] + ordem_area, key="f_area", format_func=todas, placeholder="Todas",
-                     on_change=_cb_sel_area)
-    if ss["f_pct"]:
-        df_a = df_a[df_faixa == ss["f_pct"]]
+        filtro_caixinhas("Área pendente de atuação", "f_area", ordem_area)
+    if ss["f_pct"] is not None:
+        df_a = df_a[df_faixa.isin(ss["f_pct"])]
 
     # ---------- 7. Lista de propostas ----------
     section(f"Propostas ({len(df_a)})",
@@ -1539,7 +1599,7 @@ def tab_acompanhamento(df_p, df_unidades, valores_bsw=None):
         '</div>', unsafe_allow_html=True)
     blocos = []
     plantas_u = ordenar_plantas(df_a["_PLANTA"].unique().tolist())
-    abrir = sel != "Todas" or len(plantas_u) == 1 or bool(f_viab or f_area or ss["f_pct"])
+    abrir = sel != "Todas" or len(plantas_u) == 1 or any(ss[f] is not None for f in ("f_viab", "f_area", "f_pct"))
     for planta in plantas_u:
         g = df_a[df_a["_PLANTA"] == planta].sort_values(["_INVIAVEL", "_PCT"])
         blocos.append(timeline_block_html(planta, g, aberto=abrir))
